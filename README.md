@@ -1,4 +1,8 @@
-# Ensure Device Control for Home Assistant
+# Ensure Device Control for Home Assistant (BETA)
+
+⚠️ **BETA VERSION - EARLY TESTING PHASE** ⚠️
+
+**This integration is currently in BETA and undergoing active testing. Use with caution in production environments.**
 
 A Home Assistant custom integration that provides reliable device control with intelligent retry logic and state verification.
 
@@ -50,9 +54,11 @@ All standard Home Assistant parameters are supported:
 
 ## Installation
 
+⚠️ **BETA WARNING**: This integration is in early testing. Please test thoroughly in a non-production environment first.
+
 ### Via HACS (Recommended)
 1. Add this repository as a custom HACS repository
-2. Install "Ensure Device Control"
+2. Install "Ensure Device Control (BETA)"
 3. Restart Home Assistant
 
 ### Manual Installation
@@ -61,7 +67,28 @@ All standard Home Assistant parameters are supported:
 
 ## Configuration
 
-No configuration needed - install and use immediately!
+The integration includes a configuration UI accessible via:
+**Settings** → **Integrations** → **Add Integration** → **Ensure Device Control**
+
+Configure:
+- Max retry attempts (1-10, default: 5)
+- Base timeout (500-5000ms, default: 1000ms)
+- Failure notifications (on/off, default: on)
+
+## Testing & Feedback
+
+**This is a BETA release** - please help us improve it:
+
+1. **Test thoroughly** with non-critical devices first
+2. **Report issues** via GitHub Issues
+3. **Share feedback** on functionality and reliability
+4. **Check logs** for any errors or unexpected behavior
+
+Known areas needing testing:
+- Group entity handling
+- Various device types (lights, switches, fans, etc.)
+- Configuration options functionality
+- Error handling and recovery
 
 ## Contributing
 
