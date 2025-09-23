@@ -55,8 +55,28 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
             """Handle ensure turn_off service."""
             await _handle_ensure_service(hass, call, "off")
 
+        async def retry_failed_device(call: ServiceCall) -> None:
+            """Retry a previously failed device."""
+            entity_id = call.data.get("entity_id")
+            target_state = call.data.get("target_state")
+
+            if not entity_id or not target_state:
+                _LOGGER.error("Missing entity_id or target_state for retry")
+                return
+
+            _LOGGER.info(f"Retrying failed device: {entity_id} -> {target_state}")
+
+            # Create a new service call to retry the device
+            await _ensure_entity_state(hass, entity_id, target_state, {})
+
+            # Dismiss the notification
+            await persistent_notification.async_dismiss(
+                hass, f"device_fail_{entity_id.replace('.', '_')}"
+            )
+
         hass.services.async_register(DOMAIN, SERVICE_TURN_ON, ensure_turn_on)
         hass.services.async_register(DOMAIN, SERVICE_TURN_OFF, ensure_turn_off)
+        hass.services.async_register(DOMAIN, "retry_failed_device", retry_failed_device)
 
         _LOGGER.info("Ensure services registered successfully")
 
@@ -214,11 +234,23 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
             message = f"{entity_id} failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}"
             title = "Ensure Device Control Failed"
 
+        # Create notification with retry action
+        notification_id = f"device_fail_{entity_id.replace('.', '_')}"
+
+        # Build the retry service call data
+        retry_data = {
+            "entity_id": entity_id,
+            "target_state": target_state,
+            "service_data": service_data,
+            "original_target": original_target
+        }
+
+        # Add retry button with service call
         await persistent_notification.async_create(
             hass,
-            message,
+            f"{message}\n\n**[Retry Device](/api/services/ensure/retry_failed_device?entity_id={entity_id}&target_state={target_state})**",
             title,
-            f"device_fail_{entity_id.replace('.', '_')}"
+            notification_id
         )
 
 async def _wait_for_state_change(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any]) -> None:
