@@ -1,0 +1,268 @@
+turn_on:
+  name: Turn on with retry
+  description: Reliably turn on devices with retry logic and state verification
+  target:
+    entity:
+      domain:
+        - light
+        - switch
+        - fan
+        - cover
+        - climate
+  fields:
+    brightness:
+      name: Brightness
+      description: Number indicating brightness, where 0 turns the light off, 1 is the minimum brightness and 255 is the maximum brightness supported by the light.
+      example: 120
+      selector:
+        number:
+          min: 0
+          max: 255
+    brightness_pct:
+      name: Brightness percentage
+      description: Number indicating percentage of full brightness, where 0 turns the light off, 1 is the minimum brightness and 100 is the maximum brightness supported by the light.
+      example: 47
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    rgb_color:
+      name: RGB color
+      description: A list containing three integers between 0 and 255 representing the RGB (red, green, blue) color for the light.
+      example: [255, 100, 100]
+      selector:
+        color_rgb:
+    color_name:
+      name: Color name
+      description: A human readable color name.
+      example: red
+      selector:
+        select:
+          options:
+            - "homeassistant"
+            - "aliceblue"
+            - "antiquewhite"
+            - "aqua"
+            - "aquamarine"
+            - "azure"
+            - "beige"
+            - "bisque"
+            - "blanchedalmond"
+            - "blue"
+            - "blueviolet"
+            - "brown"
+            - "burlywood"
+            - "cadetblue"
+            - "chartreuse"
+            - "chocolate"
+            - "coral"
+            - "cornflowerblue"
+            - "cornsilk"
+            - "crimson"
+            - "cyan"
+            - "darkblue"
+            - "darkcyan"
+            - "darkgoldenrod"
+            - "darkgray"
+            - "darkgreen"
+            - "darkgrey"
+            - "darkkhaki"
+            - "darkmagenta"
+            - "darkolivegreen"
+            - "darkorange"
+            - "darkorchid"
+            - "darkred"
+            - "darksalmon"
+            - "darkseagreen"
+            - "darkslateblue"
+            - "darkslategray"
+            - "darkslategrey"
+            - "darkturquoise"
+            - "darkviolet"
+            - "deeppink"
+            - "deepskyblue"
+            - "dimgray"
+            - "dimgrey"
+            - "dodgerblue"
+            - "firebrick"
+            - "floralwhite"
+            - "forestgreen"
+            - "fuchsia"
+            - "gainsboro"
+            - "ghostwhite"
+            - "gold"
+            - "goldenrod"
+            - "gray"
+            - "green"
+            - "greenyellow"
+            - "grey"
+            - "honeydew"
+            - "hotpink"
+            - "indianred"
+            - "indigo"
+            - "ivory"
+            - "khaki"
+            - "lavender"
+            - "lavenderblush"
+            - "lawngreen"
+            - "lemonchiffon"
+            - "lightblue"
+            - "lightcoral"
+            - "lightcyan"
+            - "lightgoldenrodyellow"
+            - "lightgray"
+            - "lightgreen"
+            - "lightgrey"
+            - "lightpink"
+            - "lightsalmon"
+            - "lightseagreen"
+            - "lightskyblue"
+            - "lightslategray"
+            - "lightslategrey"
+            - "lightsteelblue"
+            - "lightyellow"
+            - "lime"
+            - "limegreen"
+            - "linen"
+            - "magenta"
+            - "maroon"
+            - "mediumaquamarine"
+            - "mediumblue"
+            - "mediumorchid"
+            - "mediumpurple"
+            - "mediumseagreen"
+            - "mediumslateblue"
+            - "mediumspringgreen"
+            - "mediumturquoise"
+            - "mediumvioletred"
+            - "midnightblue"
+            - "mintcream"
+            - "mistyrose"
+            - "moccasin"
+            - "navajowhite"
+            - "navy"
+            - "oldlace"
+            - "olive"
+            - "olivedrab"
+            - "orange"
+            - "orangered"
+            - "orchid"
+            - "palegoldenrod"
+            - "palegreen"
+            - "paleturquoise"
+            - "palevioletred"
+            - "papayawhip"
+            - "peachpuff"
+            - "peru"
+            - "pink"
+            - "plum"
+            - "powderblue"
+            - "purple"
+            - "red"
+            - "rosybrown"
+            - "royalblue"
+            - "saddlebrown"
+            - "salmon"
+            - "sandybrown"
+            - "seagreen"
+            - "seashell"
+            - "sienna"
+            - "silver"
+            - "skyblue"
+            - "slateblue"
+            - "slategray"
+            - "slategrey"
+            - "snow"
+            - "springgreen"
+            - "steelblue"
+            - "tan"
+            - "teal"
+            - "thistle"
+            - "tomato"
+            - "turquoise"
+            - "violet"
+            - "wheat"
+            - "white"
+            - "whitesmoke"
+            - "yellow"
+            - "yellowgreen"
+    color_temp_kelvin:
+      name: Color temperature (Kelvin)
+      description: Color temperature in Kelvin.
+      selector:
+        color_temp:
+          unit: kelvin
+    kelvin:
+      name: Kelvin
+      description: Color temperature in Kelvin (alias for color_temp_kelvin).
+      selector:
+        color_temp:
+          unit: kelvin
+    xy_color:
+      name: XY-color
+      description: Color in XY-format.
+      example: [0.52, 0.43]
+      selector:
+        object:
+    hs_color:
+      name: Hue/Sat color
+      description: Color in hue/sat format. Hue is 0-360 and Sat is 0-100.
+      example: [300, 70]
+      selector:
+        object:
+    white:
+      name: White
+      description: Set the light to white mode and optionally set the white level.
+      selector:
+        number:
+          min: 0
+          max: 255
+    color_temp:
+      name: Color temperature (mireds)
+      description: Color temperature in mireds.
+      selector:
+        color_temp:
+          unit: mired
+    effect:
+      name: Effect
+      description: Light effect.
+      selector:
+        text:
+    flash:
+      name: Flash
+      description: If the light should flash.
+      selector:
+        select:
+          options:
+            - "long"
+            - "short"
+    transition:
+      name: Transition
+      description: Duration it takes to get to next state.
+      selector:
+        number:
+          min: 0
+          max: 300
+          unit_of_measurement: s
+
+turn_off:
+  name: Turn off with retry
+  description: Reliably turn off devices with retry logic and state verification
+  target:
+    entity:
+      domain:
+        - light
+        - switch
+        - fan
+        - cover
+        - climate
+  fields:
+    transition:
+      name: Transition
+      description: Duration it takes to get to next state.
+      selector:
+        number:
+          min: 0
+          max: 300
+          unit_of_measurement: s

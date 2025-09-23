@@ -1,0 +1,16 @@
+{
+  "domain": "ensure",
+  "name": "Ensure Device Control",
+  "codeowners": ["@markus99"],
+  "config_flow": false,
+  "documentation": "https://github.com/markus99/hacs-ensure-integration",
+  "issue_tracker": "https://github.com/markus99/hacs-ensure-integration/issues",
+  "requirements": [],
+  "ssdp": [],
+  "zeroconf": [],
+  "homekit": {},
+  "dependencies": [],
+  "after_dependencies": [],
+  "iot_class": "local_polling",
+  "version": "1.0.0"
+}

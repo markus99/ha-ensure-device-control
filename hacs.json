@@ -1,0 +1,11 @@
+{
+  "name": "Ensure Device Control",
+  "content_in_root": false,
+  "filename": "ensure",
+  "country": ["US"],
+  "homeassistant": "2023.1.0",
+  "render_readme": true,
+  "domains": ["ensure"],
+  "iot_class": "Local Polling",
+  "version": "1.0.0"
+}
