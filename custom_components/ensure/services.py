@@ -45,60 +45,81 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: str) -> None:
     """Handle the ensure service call with retry logic."""
 
-    # Get target entities
-    entity_ids = _get_target_entities(hass, call)
-    if not entity_ids:
+    # Get original input for first attempt (preserves groups)
+    original_target = _get_original_target(call)
+    if not original_target:
         raise ServiceValidationError("No entities specified")
 
-    _LOGGER.debug(f"Ensure {state} called for entities: {entity_ids}")
+    _LOGGER.debug(f"Ensure {state} called for original target: {original_target}")
 
     # Get service data
     service_data = dict(call.data)
     service_data.pop("entity_id", None)  # Remove if present
 
-    # Try default method first for all entities
-    await _try_default_method(hass, entity_ids, state, service_data)
+    # Try original target first (preserves group operations for speed)
+    await _try_original_target(hass, original_target, state, service_data)
 
     # Wait a moment for the command to propagate
     await asyncio.sleep(1)
 
-    # Process each entity with retry logic
-    tasks = []
-    for entity_id in entity_ids:
-        task = _ensure_entity_state(hass, entity_id, state, service_data)
-        tasks.append(task)
+    # Now expand to individual entities for verification/retry
+    expanded_entities = _get_target_entities(hass, call)
+    if not expanded_entities:
+        _LOGGER.warning("No entities found after expansion")
+        return
 
-    # Run all entity tasks concurrently but with queued mode behavior
-    # by processing them one at a time to avoid overwhelming Hubitat
-    for task in tasks:
-        await task
+    _LOGGER.debug(f"Expanded to individual entities: {expanded_entities}")
 
-async def _try_default_method(hass: HomeAssistant, entity_ids: List[str], state: str, service_data: Dict[str, Any]) -> None:
-    """Try the default service method first."""
+    # Process each individual entity with retry logic (queued mode)
+    for entity_id in expanded_entities:
+        await _ensure_entity_state(hass, entity_id, state, service_data)
 
-    for entity_id in entity_ids:
-        domain = entity_id.split(".")[0]
+async def _try_original_target(hass: HomeAssistant, original_target: str, state: str, service_data: Dict[str, Any]) -> None:
+    """Try the original target as-is (matching original script logic)."""
 
-        # Determine service to call
-        if domain == "group":
-            service_name = f"homeassistant.turn_{state}"
-        else:
-            service_name = f"{domain}.turn_{state}"
+    # Determine service to call based on original script logic
+    if 'group' in original_target:
+        service_domain = "homeassistant"
+        service_name = f"turn_{state}"
+    else:
+        domain = original_target.split(".")[0]
+        service_domain = domain
+        service_name = f"turn_{state}"
 
-        # Prepare service data
-        data = {"entity_id": entity_id}
-        if service_data:
-            data.update(service_data)
+    # Prepare service data
+    data = {"entity_id": original_target}
+    if service_data:
+        data.update(service_data)
 
-        try:
-            await hass.services.async_call(
-                service_name.split(".")[0],
-                service_name.split(".")[1],
-                data
-            )
-            _LOGGER.debug(f"Called {service_name} for {entity_id}")
-        except Exception as e:
-            _LOGGER.warning(f"Default method failed for {entity_id}: {e}")
+    try:
+        await hass.services.async_call(service_domain, service_name, data)
+        _LOGGER.debug(f"Called {service_domain}.{service_name} for original target: {original_target}")
+    except Exception as e:
+        _LOGGER.warning(f"Original target method failed for {original_target}: {e}")
+
+def _get_original_target(call: ServiceCall) -> str:
+    """Get the original target entity_id as specified in the call (before expansion)."""
+
+    # Check entity_id in data first (legacy)
+    if "entity_id" in call.data:
+        entity_id = call.data["entity_id"]
+        if isinstance(entity_id, str):
+            return entity_id
+        elif isinstance(entity_id, list) and len(entity_id) == 1:
+            return entity_id[0]
+        elif isinstance(entity_id, list) and len(entity_id) > 1:
+            # Multiple entities - use first one as representative
+            return entity_id[0]
+
+    # Check target parameter (modern)
+    if hasattr(call, 'target') and call.target:
+        if call.target.entity_id and len(call.target.entity_id) == 1:
+            return call.target.entity_id[0]
+        elif call.target.entity_id and len(call.target.entity_id) > 1:
+            # Multiple entities - use first one as representative
+            return call.target.entity_id[0]
+
+    return None
 
 async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any]) -> None:
     """Ensure a single entity reaches the target state with retry logic."""
