@@ -21,12 +21,15 @@ DEFAULT_BACKGROUND_RETRY_DELAY = 30  # seconds
 # Fixed retry settings (not configurable)
 FIXED_TIMEOUT_INCREMENT = 500  # milliseconds
 FIXED_INITIAL_DELAY = 1  # seconds
+BACKGROUND_RETRY_DISABLE_THRESHOLD = 300  # seconds
 
 # Technical tolerance settings (hardcoded, not user configurable)
 BRIGHTNESS_TOLERANCE = 8  # brightness units (0-255) - ~3%
 BRIGHTNESS_PCT_TOLERANCE = 1  # percentage points
 RGB_TOLERANCE = 5  # RGB color value tolerance per channel
 KELVIN_TOLERANCE = 50  # color temperature tolerance
+HUE_TOLERANCE = 5  # degrees (0-360)
+SATURATION_TOLERANCE = 5  # percentage points (0-100)
 
 # Supported service parameters
 SUPPORTED_FEATURES = [

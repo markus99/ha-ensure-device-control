@@ -22,10 +22,13 @@ from .const import (
     DEFAULT_BACKGROUND_RETRY_DELAY,
     FIXED_TIMEOUT_INCREMENT,
     FIXED_INITIAL_DELAY,
+    BACKGROUND_RETRY_DISABLE_THRESHOLD,
     BRIGHTNESS_TOLERANCE,
     BRIGHTNESS_PCT_TOLERANCE,
     RGB_TOLERANCE,
     KELVIN_TOLERANCE,
+    HUE_TOLERANCE,
+    SATURATION_TOLERANCE,
     SUPPORTED_FEATURES,
 )
 
@@ -231,8 +234,8 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
     if _service_config[CONF_ENABLE_NOTIFICATIONS]:
         background_delay = _service_config[CONF_BACKGROUND_RETRY_DELAY]
 
-        # If background retry is disabled (300s+), notify immediately
-        if background_delay >= 300:
+        # If background retry is disabled (threshold+), notify immediately
+        if background_delay >= BACKGROUND_RETRY_DISABLE_THRESHOLD:
             _LOGGER.info(f"Background retry disabled (delay={background_delay}s), notifying immediately")
             await _create_failure_notification(hass, entity_id, target_state, max_retries, current_state_value, original_target, immediate=True)
         else:
