@@ -1,6 +1,7 @@
 # Exclude user-specific configuration files
 scripts.yaml
 automation.yaml
+progress.md
 
 # Screenshots and temp files
 *.png
