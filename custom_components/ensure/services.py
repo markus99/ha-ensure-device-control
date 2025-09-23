@@ -227,42 +227,20 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
 
     _LOGGER.error(f"{entity_id} failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}")
 
-    # Create persistent notification if enabled
+    # Handle notification and background retry logic
     if _service_config[CONF_ENABLE_NOTIFICATIONS]:
-        # Create more specific message if this was part of a group operation
-        if original_target and original_target != entity_id and 'group' in original_target:
-            message = f"Device {entity_id} (from group {original_target}) failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}"
-            title = "Ensure Device Control Failed (Group Member)"
-        else:
-            message = f"{entity_id} failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}"
-            title = "Ensure Device Control Failed"
-
-        # Create notification with retry action
-        notification_id = f"device_fail_{entity_id.replace('.', '_')}"
-
-        # Build the retry service call data
-        retry_data = {
-            "entity_id": entity_id,
-            "target_state": target_state,
-            "service_data": service_data,
-            "original_target": original_target
-        }
-
-        # Schedule background retry
         background_delay = _service_config[CONF_BACKGROUND_RETRY_DELAY]
-        _LOGGER.info(f"Scheduling background retry for {entity_id} in {background_delay} seconds")
 
-        hass.async_create_task(
-            _background_retry(hass, entity_id, target_state, service_data, original_target, background_delay)
-        )
-
-        # Add retry button with service call
-        await persistent_notification.async_create(
-            hass,
-            f"{message}\n\nBackground retry scheduled in {background_delay}s\n\n**[Retry Device Now](/api/services/ensure/retry_failed_device?entity_id={entity_id}&target_state={target_state})**",
-            title,
-            notification_id
-        )
+        # If background retry is disabled (300s+), notify immediately
+        if background_delay >= 300:
+            _LOGGER.info(f"Background retry disabled (delay={background_delay}s), notifying immediately")
+            await _create_failure_notification(hass, entity_id, target_state, max_retries, current_state_value, original_target, immediate=True)
+        else:
+            # Schedule background retry - notification only happens if that fails too
+            _LOGGER.info(f"Scheduling background retry for {entity_id} in {background_delay} seconds (no immediate notification)")
+            hass.async_create_task(
+                _background_retry(hass, entity_id, target_state, service_data, original_target, background_delay, max_retries)
+            )
 
 async def _wait_for_state_change(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any]) -> None:
     """Wait for entity to reach target state."""
@@ -459,7 +437,30 @@ def _resolve_parameter_conflicts(hass: HomeAssistant, service_data: Dict[str, An
 
     return resolved_data
 
-async def _background_retry(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any], original_target: str, delay_seconds: int) -> None:
+async def _create_failure_notification(hass: HomeAssistant, entity_id: str, target_state: str, max_retries: int, current_state_value: str, original_target: str = None, immediate: bool = False) -> None:
+    """Create a failure notification with appropriate message."""
+
+    # Create more specific message if this was part of a group operation
+    if original_target and original_target != entity_id and 'group' in original_target:
+        message = f"Device {entity_id} (from group {original_target}) failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}"
+        title = "Ensure Device Control Failed (Group Member)"
+    else:
+        message = f"{entity_id} failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}"
+        title = "Ensure Device Control Failed"
+
+    if not immediate:
+        title += " (Background Retry Also Failed)"
+        message = f"⚠️ {message}\n\nBoth immediate and background retries failed. Manual intervention may be required."
+
+    notification_id = f"device_fail_{entity_id.replace('.', '_')}"
+    await persistent_notification.async_create(
+        hass,
+        f"{message}\n\n**[Retry Device Now](/api/services/ensure/retry_failed_device?entity_id={entity_id}&target_state={target_state})**",
+        title,
+        notification_id
+    )
+
+async def _background_retry(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any], original_target: str, delay_seconds: int, original_max_retries: int) -> None:
     """Background retry function that waits and then retries the failed device."""
 
     _LOGGER.debug(f"Background retry sleeping {delay_seconds}s for {entity_id}")
@@ -468,20 +469,15 @@ async def _background_retry(hass: HomeAssistant, entity_id: str, target_state: s
     # Check if device is already in correct state
     if await _is_entity_in_target_state(hass, entity_id, target_state, service_data):
         _LOGGER.info(f"Background retry: {entity_id} already in correct state, skipping retry")
-
-        # Dismiss notification since device is now working
-        await persistent_notification.async_dismiss(
-            hass, f"device_fail_{entity_id.replace('.', '_')}"
-        )
         return
 
     _LOGGER.info(f"Background retry: Starting retry attempt for {entity_id} -> {target_state}")
 
     try:
-        # Attempt the retry with full retry logic
-        await _ensure_entity_state(hass, entity_id, target_state, service_data, original_target)
+        # Attempt the retry with full retry logic, but avoid infinite background retries
+        await _ensure_entity_state_no_background(hass, entity_id, target_state, service_data, original_target)
 
-        # If successful, update notification
+        # If successful, show success notification
         await persistent_notification.async_create(
             hass,
             f"✅ Background retry successful: {entity_id} is now {target_state.upper()}",
@@ -489,19 +485,67 @@ async def _background_retry(hass: HomeAssistant, entity_id: str, target_state: s
             f"device_success_{entity_id.replace('.', '_')}"
         )
 
-        # Dismiss the original failure notification
-        await persistent_notification.async_dismiss(
-            hass, f"device_fail_{entity_id.replace('.', '_')}"
-        )
-
     except Exception as e:
         _LOGGER.error(f"Background retry failed for {entity_id}: {e}")
 
-        # Update notification to show background retry also failed
-        notification_id = f"device_fail_{entity_id.replace('.', '_')}"
-        await persistent_notification.async_create(
-            hass,
-            f"⚠️ Background retry also failed for {entity_id}. Manual intervention may be required.\n\n**[Retry Device Now](/api/services/ensure/retry_failed_device?entity_id={entity_id}&target_state={target_state})**",
-            "Ensure Device Control - Background Retry Failed",
-            notification_id
-        )
+        # Now create the failure notification since both immediate and background failed
+        current_state = hass.states.get(entity_id)
+        current_state_value = current_state.state if current_state else "unknown"
+
+        if _service_config[CONF_ENABLE_NOTIFICATIONS]:
+            await _create_failure_notification(hass, entity_id, target_state, original_max_retries, current_state_value, original_target, immediate=False)
+
+async def _ensure_entity_state_no_background(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any], original_target: str = None) -> None:
+    """Ensure entity state with retry logic but without background retry (prevents infinite loops)."""
+    global _service_config
+
+    domain = entity_id.split(".")[0]
+    retry_count = 0
+    max_retries = _service_config[CONF_MAX_RETRIES]
+
+    # Use delay parameter override if provided, otherwise use configured base timeout
+    base_timeout = service_data.get("delay", _service_config[CONF_BASE_TIMEOUT])
+
+    while retry_count < max_retries:
+        # Check if entity is already in desired state
+        if await _is_entity_in_target_state(hass, entity_id, target_state, service_data):
+            _LOGGER.debug(f"{entity_id} reached target state on background retry attempt {retry_count + 1}")
+            return
+
+        retry_count += 1
+
+        # Calculate timeout for this attempt
+        timeout_ms = base_timeout + (retry_count * FIXED_TIMEOUT_INCREMENT)
+        timeout_sec = timeout_ms / 1000
+
+        _LOGGER.debug(f"Background retry {retry_count}/{max_retries} for {entity_id}, timeout: {timeout_sec}s")
+
+        # Call the service
+        data = {"entity_id": entity_id}
+        if service_data:
+            # Filter out ensure-specific parameters that shouldn't go to the device
+            filtered_data = {k: v for k, v in service_data.items() if k != "delay"}
+            data.update(filtered_data)
+
+        try:
+            await hass.services.async_call(
+                domain,
+                f"turn_{target_state}",
+                data
+            )
+        except Exception as e:
+            _LOGGER.warning(f"Background retry service call failed for {entity_id} on attempt {retry_count}: {e}")
+
+        # Wait for state change with timeout
+        try:
+            await asyncio.wait_for(
+                _wait_for_state_change(hass, entity_id, target_state, service_data),
+                timeout=timeout_sec
+            )
+        except asyncio.TimeoutError:
+            _LOGGER.debug(f"Background retry timeout waiting for {entity_id} state change on attempt {retry_count}")
+            continue
+
+    # If we get here, background retry failed too
+    _LOGGER.error(f"Background retry failed for {entity_id} after {max_retries} attempts")
+    raise Exception(f"Background retry failed after {max_retries} attempts")
