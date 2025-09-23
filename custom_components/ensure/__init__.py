@@ -9,9 +9,11 @@ from .const import (
     CONF_MAX_RETRIES,
     CONF_BASE_TIMEOUT,
     CONF_ENABLE_NOTIFICATIONS,
+    CONF_BACKGROUND_RETRY_DELAY,
     DEFAULT_MAX_RETRIES,
     DEFAULT_BASE_TIMEOUT,
     DEFAULT_ENABLE_NOTIFICATIONS,
+    DEFAULT_BACKGROUND_RETRY_DELAY,
 )
 from .services import async_setup_services
 
@@ -31,6 +33,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         CONF_MAX_RETRIES: options.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES),
         CONF_BASE_TIMEOUT: options.get(CONF_BASE_TIMEOUT, DEFAULT_BASE_TIMEOUT),
         CONF_ENABLE_NOTIFICATIONS: options.get(CONF_ENABLE_NOTIFICATIONS, DEFAULT_ENABLE_NOTIFICATIONS),
+        CONF_BACKGROUND_RETRY_DELAY: options.get(CONF_BACKGROUND_RETRY_DELAY, DEFAULT_BACKGROUND_RETRY_DELAY),
     }
 
     # Store config in hass.data
@@ -52,6 +55,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if len(hass.data[DOMAIN]) == 1:
         hass.services.async_remove(DOMAIN, "turn_on")
         hass.services.async_remove(DOMAIN, "turn_off")
+        hass.services.async_remove(DOMAIN, "retry_failed_device")
 
     # Remove config data
     hass.data[DOMAIN].pop(entry.entry_id)
