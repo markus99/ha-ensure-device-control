@@ -10,8 +10,9 @@ A Home Assistant custom integration that provides reliable device control with i
 
 Standard Home Assistant device commands sometimes fail, especially with:
 - **Hubitat Maker API** integrations
-- **Z-Wave/Zigbee** mesh network congestion  
+- **Z-Wave/Zigbee** mesh network congestion
 - **Remote devices** with connectivity issues
+- **Slow fans** that need extra time to respond
 - **Critical automations** that must work reliably
 
 This integration solves those problems by adding retry logic with exponential backoff and state verification to ensure your devices actually respond.
@@ -31,9 +32,27 @@ data:
 # Use this:
 action: ensure.turn_on
 target:
-  entity_id: light.living_room  
+  entity_id: light.living_room
 data:
   brightness_pct: 75
+```
+
+**Works with lights, switches, fans, and groups:**
+
+```yaml
+# Fan control with retry
+action: ensure.turn_on
+target:
+  entity_id: fan.bedroom
+data:
+  speed_pct: 60
+
+# Group operations (fast bulk + individual verification)
+action: ensure.turn_on
+target:
+  entity_id: group.living_room_lights
+data:
+  brightness_pct: 80
 ```
 
 The integration will automatically retry up to 5 times with increasing delays if the device doesn't respond, and notify you if it ultimately fails.
@@ -46,9 +65,11 @@ The integration will automatically retry up to 5 times with increasing delays if
 ## Supported Parameters
 
 All standard Home Assistant parameters are supported:
-- `brightness` / `brightness_pct`
-- `rgb_color` / `hs_color` / `xy_color` / `color_name`
-- `color_temp_kelvin` / `kelvin`
+- `brightness` / `brightness_pct` (lights)
+- `rgb_color` / `hs_color` / `xy_color` / `color_name` (lights)
+- `color_temp_kelvin` / `kelvin` (lights)
+- `speed` / `speed_pct` (fans)
+- `delay` (custom timeout override)
 - `transition` (Light Transition Timing)
 - `effect` / `flash`
 - And more...
@@ -76,6 +97,26 @@ data:
 data:
   color_temp_kelvin: 3000  # This wins
   kelvin: 4000             # This gets removed
+```
+
+**Fan Speed**: `speed_pct` > `speed`
+```yaml
+data:
+  speed_pct: 75     # This wins
+  speed: "high"     # This gets removed
+```
+
+### Custom Delay Override
+
+Use the `delay` parameter to override timeout for slower devices:
+
+```yaml
+action: ensure.turn_on
+target:
+  entity_id: fan.slow_ceiling_fan
+data:
+  speed_pct: 50
+  delay: 3000  # 3 seconds instead of default 1 second
 ```
 
 **No Defaults Added**: The integration only removes conflicts - it doesn't add default values. If you don't specify brightness, the device keeps its current brightness.
