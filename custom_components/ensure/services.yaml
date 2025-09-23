@@ -6,6 +6,7 @@ turn_on:
       domain:
         - light
         - switch
+        - fan
         - group
   fields:
     brightness:
@@ -235,6 +236,30 @@ turn_on:
           options:
             - "long"
             - "short"
+    speed:
+      name: Fan Speed
+      description: Speed setting for fans (low, medium, high, or percentage 0-100).
+      example: "medium"
+      selector:
+        text:
+    speed_pct:
+      name: Fan Speed Percentage
+      description: Fan speed as percentage (0-100).
+      example: 75
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    delay:
+      name: Custom Delay Override
+      description: Override base timeout for this call (milliseconds). Use for slower devices.
+      example: 2000
+      selector:
+        number:
+          min: 500
+          max: 10000
+          unit_of_measurement: ms
     transition:
       name: Light Transition Timing
       description: Duration in seconds for smooth fade to next state (0 = instant).
@@ -252,8 +277,18 @@ turn_off:
       domain:
         - light
         - switch
+        - fan
         - group
   fields:
+    delay:
+      name: Custom Delay Override
+      description: Override base timeout for this call (milliseconds). Use for slower devices.
+      example: 2000
+      selector:
+        number:
+          min: 500
+          max: 10000
+          unit_of_measurement: ms
     transition:
       name: Light Transition Timing
       description: Duration in seconds for smooth fade to next state (0 = instant).

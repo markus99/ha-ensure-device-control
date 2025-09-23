@@ -42,5 +42,8 @@ SUPPORTED_FEATURES = [
     "color_temp",
     "effect",
     "flash",
-    "transition"  # Light transition timing (seconds for smooth fade)
+    "speed",        # Fan speed (low, medium, high)
+    "speed_pct",    # Fan speed percentage (0-100)
+    "delay",        # Custom delay override (ensure-specific)
+    "transition"    # Light transition timing (seconds for smooth fade)
 ]

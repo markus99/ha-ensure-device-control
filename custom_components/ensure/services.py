@@ -110,7 +110,9 @@ async def _try_original_target(hass: HomeAssistant, original_target: str, state:
     # Prepare service data
     data = {"entity_id": original_target}
     if service_data:
-        data.update(service_data)
+        # Filter out ensure-specific parameters that shouldn't go to the device
+        filtered_data = {k: v for k, v in service_data.items() if k != "delay"}
+        data.update(filtered_data)
 
     try:
         await hass.services.async_call(service_domain, service_name, data)
@@ -149,7 +151,11 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
     domain = entity_id.split(".")[0]
     retry_count = 0
     max_retries = _service_config[CONF_MAX_RETRIES]
-    base_timeout = _service_config[CONF_BASE_TIMEOUT]
+
+    # Use delay parameter override if provided, otherwise use configured base timeout
+    base_timeout = service_data.get("delay", _service_config[CONF_BASE_TIMEOUT])
+    if "delay" in service_data:
+        _LOGGER.debug(f"Using custom delay override: {base_timeout}ms for {entity_id}")
 
     while retry_count < max_retries:
         # Check if entity is already in desired state
@@ -169,7 +175,9 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
         service_name = f"{domain}.turn_{target_state}"
         data = {"entity_id": entity_id}
         if service_data:
-            data.update(service_data)
+            # Filter out ensure-specific parameters that shouldn't go to the device
+            filtered_data = {k: v for k, v in service_data.items() if k != "delay"}
+            data.update(filtered_data)
 
         try:
             await hass.services.async_call(
@@ -381,6 +389,21 @@ def _resolve_parameter_conflicts(hass: HomeAssistant, service_data: Dict[str, An
         for param in kelvin_params:
             if param != found_kelvin and param in resolved_data:
                 _LOGGER.debug(f"Removing conflicting kelvin parameter '{param}', keeping '{found_kelvin}'")
+                resolved_data.pop(param)
+
+    # FAN SPEED CONFLICT RESOLUTION
+    speed_params = ["speed_pct", "speed"]
+    found_speed = None
+    for param in speed_params:
+        if param in resolved_data:
+            found_speed = param
+            break
+
+    # Remove conflicting speed parameters (keep only the first found)
+    if found_speed:
+        for param in speed_params:
+            if param != found_speed and param in resolved_data:
+                _LOGGER.debug(f"Removing conflicting fan speed parameter '{param}', keeping '{found_speed}'")
                 resolved_data.pop(param)
 
     return resolved_data
