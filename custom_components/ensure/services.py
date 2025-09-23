@@ -15,9 +15,11 @@ from .const import (
     CONF_MAX_RETRIES,
     CONF_BASE_TIMEOUT,
     CONF_ENABLE_NOTIFICATIONS,
+    CONF_BACKGROUND_RETRY_DELAY,
     DEFAULT_MAX_RETRIES,
     DEFAULT_BASE_TIMEOUT,
     DEFAULT_ENABLE_NOTIFICATIONS,
+    DEFAULT_BACKGROUND_RETRY_DELAY,
     FIXED_TIMEOUT_INCREMENT,
     FIXED_INITIAL_DELAY,
     BRIGHTNESS_TOLERANCE,
@@ -34,6 +36,7 @@ _service_config = {
     CONF_MAX_RETRIES: DEFAULT_MAX_RETRIES,
     CONF_BASE_TIMEOUT: DEFAULT_BASE_TIMEOUT,
     CONF_ENABLE_NOTIFICATIONS: DEFAULT_ENABLE_NOTIFICATIONS,
+    CONF_BACKGROUND_RETRY_DELAY: DEFAULT_BACKGROUND_RETRY_DELAY,
 }
 
 async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = None) -> None:
@@ -245,10 +248,18 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
             "original_target": original_target
         }
 
+        # Schedule background retry
+        background_delay = _service_config[CONF_BACKGROUND_RETRY_DELAY]
+        _LOGGER.info(f"Scheduling background retry for {entity_id} in {background_delay} seconds")
+
+        hass.async_create_task(
+            _background_retry(hass, entity_id, target_state, service_data, original_target, background_delay)
+        )
+
         # Add retry button with service call
         await persistent_notification.async_create(
             hass,
-            f"{message}\n\n**[Retry Device](/api/services/ensure/retry_failed_device?entity_id={entity_id}&target_state={target_state})**",
+            f"{message}\n\nBackground retry scheduled in {background_delay}s\n\n**[Retry Device Now](/api/services/ensure/retry_failed_device?entity_id={entity_id}&target_state={target_state})**",
             title,
             notification_id
         )
@@ -447,3 +458,50 @@ def _resolve_parameter_conflicts(hass: HomeAssistant, service_data: Dict[str, An
                 resolved_data.pop(param)
 
     return resolved_data
+
+async def _background_retry(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any], original_target: str, delay_seconds: int) -> None:
+    """Background retry function that waits and then retries the failed device."""
+
+    _LOGGER.debug(f"Background retry sleeping {delay_seconds}s for {entity_id}")
+    await asyncio.sleep(delay_seconds)
+
+    # Check if device is already in correct state
+    if await _is_entity_in_target_state(hass, entity_id, target_state, service_data):
+        _LOGGER.info(f"Background retry: {entity_id} already in correct state, skipping retry")
+
+        # Dismiss notification since device is now working
+        await persistent_notification.async_dismiss(
+            hass, f"device_fail_{entity_id.replace('.', '_')}"
+        )
+        return
+
+    _LOGGER.info(f"Background retry: Starting retry attempt for {entity_id} -> {target_state}")
+
+    try:
+        # Attempt the retry with full retry logic
+        await _ensure_entity_state(hass, entity_id, target_state, service_data, original_target)
+
+        # If successful, update notification
+        await persistent_notification.async_create(
+            hass,
+            f"✅ Background retry successful: {entity_id} is now {target_state.upper()}",
+            "Ensure Device Control - Success",
+            f"device_success_{entity_id.replace('.', '_')}"
+        )
+
+        # Dismiss the original failure notification
+        await persistent_notification.async_dismiss(
+            hass, f"device_fail_{entity_id.replace('.', '_')}"
+        )
+
+    except Exception as e:
+        _LOGGER.error(f"Background retry failed for {entity_id}: {e}")
+
+        # Update notification to show background retry also failed
+        notification_id = f"device_fail_{entity_id.replace('.', '_')}"
+        await persistent_notification.async_create(
+            hass,
+            f"⚠️ Background retry also failed for {entity_id}. Manual intervention may be required.\n\n**[Retry Device Now](/api/services/ensure/retry_failed_device?entity_id={entity_id}&target_state={target_state})**",
+            "Ensure Device Control - Background Retry Failed",
+            notification_id
+        )

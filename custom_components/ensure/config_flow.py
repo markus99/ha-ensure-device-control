@@ -13,9 +13,11 @@ from .const import (
     CONF_MAX_RETRIES,
     CONF_BASE_TIMEOUT,
     CONF_ENABLE_NOTIFICATIONS,
+    CONF_BACKGROUND_RETRY_DELAY,
     DEFAULT_MAX_RETRIES,
     DEFAULT_BASE_TIMEOUT,
     DEFAULT_ENABLE_NOTIFICATIONS,
+    DEFAULT_BACKGROUND_RETRY_DELAY,
 )
 
 
@@ -56,6 +58,9 @@ class EnsureConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 int, vol.Range(min=500, max=5000)
             ),
             vol.Optional(CONF_ENABLE_NOTIFICATIONS, default=DEFAULT_ENABLE_NOTIFICATIONS): bool,
+            vol.Optional(CONF_BACKGROUND_RETRY_DELAY, default=DEFAULT_BACKGROUND_RETRY_DELAY): vol.All(
+                int, vol.Range(min=10, max=300)
+            ),
         })
 
         return self.async_show_form(
@@ -90,11 +95,14 @@ class EnsureOptionsFlowHandler(config_entries.OptionsFlow):
             # Validate input
             max_retries = user_input.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES)
             base_timeout = user_input.get(CONF_BASE_TIMEOUT, DEFAULT_BASE_TIMEOUT)
+            background_retry_delay = user_input.get(CONF_BACKGROUND_RETRY_DELAY, DEFAULT_BACKGROUND_RETRY_DELAY)
 
             if max_retries < 1 or max_retries > 10:
                 errors[CONF_MAX_RETRIES] = "invalid_retries"
             elif base_timeout < 500 or base_timeout > 5000:
                 errors[CONF_BASE_TIMEOUT] = "invalid_timeout"
+            elif background_retry_delay < 10 or background_retry_delay > 300:
+                errors[CONF_BACKGROUND_RETRY_DELAY] = "invalid_background_delay"
             else:
                 # Update options
                 return self.async_create_entry(title="", data=user_input)
@@ -115,6 +123,10 @@ class EnsureOptionsFlowHandler(config_entries.OptionsFlow):
                 CONF_ENABLE_NOTIFICATIONS,
                 default=current_options.get(CONF_ENABLE_NOTIFICATIONS, DEFAULT_ENABLE_NOTIFICATIONS)
             ): bool,
+            vol.Optional(
+                CONF_BACKGROUND_RETRY_DELAY,
+                default=current_options.get(CONF_BACKGROUND_RETRY_DELAY, DEFAULT_BACKGROUND_RETRY_DELAY)
+            ): vol.All(int, vol.Range(min=10, max=300)),
         })
 
         return self.async_show_form(

@@ -10,11 +10,13 @@ SERVICE_TURN_OFF = "turn_off"
 CONF_MAX_RETRIES = "max_retries"
 CONF_BASE_TIMEOUT = "base_timeout"
 CONF_ENABLE_NOTIFICATIONS = "enable_notifications"
+CONF_BACKGROUND_RETRY_DELAY = "background_retry_delay"
 
 # Default configuration values
 DEFAULT_MAX_RETRIES = 5
 DEFAULT_BASE_TIMEOUT = 1000  # milliseconds
 DEFAULT_ENABLE_NOTIFICATIONS = True
+DEFAULT_BACKGROUND_RETRY_DELAY = 30  # seconds
 
 # Fixed retry settings (not configurable)
 FIXED_TIMEOUT_INCREMENT = 500  # milliseconds
