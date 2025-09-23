@@ -1,8 +1,8 @@
-# Ensure Device Control for Home Assistant
+# Ensure Device Control for Home Assistant (BETA)
 
-🎉 **STABLE RELEASE - PRODUCTION READY** 🎉
+⚠️ **BETA VERSION - ADVANCED TESTING PHASE** ⚠️
 
-A Home Assistant custom integration that provides **guaranteed reliable device control** with intelligent retry logic, background recovery, and Hubitat overload protection.
+A Home Assistant custom integration that provides **reliable device control** with intelligent retry logic, background recovery, and Hubitat overload protection.
 
 ## Why This Integration?
 
@@ -55,7 +55,7 @@ data:
 
 The integration will automatically retry up to 5 times with increasing delays if the device doesn't respond, and notify you if it ultimately fails.
 
-## ✨ New in v0.3.0
+## ✨ New in v0.3.1-beta
 
 ### 🚀 **Performance Improvements**
 - **Concurrent Processing**: Groups now process up to 3x faster
@@ -137,11 +137,11 @@ data:
 
 ## Installation
 
-✅ **PRODUCTION READY**: This integration is stable and thoroughly tested for production use.
+⚠️ **BETA VERSION**: This integration is in advanced testing. Please test thoroughly before production use.
 
 ### Via HACS (Recommended)
 1. Add this repository as a custom HACS repository
-2. Install "Ensure Device Control"
+2. Install "Ensure Device Control (BETA)"
 3. Restart Home Assistant
 
 ### Manual Installation
@@ -161,7 +161,7 @@ Configure:
 
 ## Testing & Feedback
 
-**Now stable and production-ready** - feedback still welcome:
+**BETA testing in progress** - feedback needed:
 
 1. **Test thoroughly** with non-critical devices first
 2. **Report issues** via GitHub Issues
