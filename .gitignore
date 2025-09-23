@@ -2,6 +2,9 @@
 scripts.yaml
 automation.yaml
 
+# Screenshots and temp files
+*.png
+
 # Python
 __pycache__/
 *.py[cod]
