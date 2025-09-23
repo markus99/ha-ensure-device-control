@@ -12,35 +12,53 @@ from .const import (
     DOMAIN,
     SERVICE_TURN_ON,
     SERVICE_TURN_OFF,
+    CONF_MAX_RETRIES,
+    CONF_BASE_TIMEOUT,
+    CONF_ENABLE_NOTIFICATIONS,
     DEFAULT_MAX_RETRIES,
     DEFAULT_BASE_TIMEOUT,
-    DEFAULT_TIMEOUT_INCREMENT,
+    DEFAULT_ENABLE_NOTIFICATIONS,
+    FIXED_TIMEOUT_INCREMENT,
+    FIXED_INITIAL_DELAY,
     BRIGHTNESS_TOLERANCE,
     BRIGHTNESS_PCT_TOLERANCE,
     RGB_TOLERANCE,
     KELVIN_TOLERANCE,
-    HUE_TOLERANCE,
-    SATURATION_TOLERANCE,
     SUPPORTED_FEATURES,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_services(hass: HomeAssistant) -> None:
+# Global config storage for services
+_service_config = {
+    CONF_MAX_RETRIES: DEFAULT_MAX_RETRIES,
+    CONF_BASE_TIMEOUT: DEFAULT_BASE_TIMEOUT,
+    CONF_ENABLE_NOTIFICATIONS: DEFAULT_ENABLE_NOTIFICATIONS,
+}
+
+async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = None) -> None:
     """Set up the ensure services."""
+    global _service_config
 
-    async def ensure_turn_on(call: ServiceCall) -> None:
-        """Handle ensure turn_on service."""
-        await _handle_ensure_service(hass, call, "on")
+    # Update global config if provided
+    if config:
+        _service_config.update(config)
+        _LOGGER.debug(f"Updated service config: {_service_config}")
 
-    async def ensure_turn_off(call: ServiceCall) -> None:
-        """Handle ensure turn_off service."""
-        await _handle_ensure_service(hass, call, "off")
+    # Only register services once
+    if not hass.services.has_service(DOMAIN, SERVICE_TURN_ON):
+        async def ensure_turn_on(call: ServiceCall) -> None:
+            """Handle ensure turn_on service."""
+            await _handle_ensure_service(hass, call, "on")
 
-    hass.services.async_register(DOMAIN, SERVICE_TURN_ON, ensure_turn_on)
-    hass.services.async_register(DOMAIN, SERVICE_TURN_OFF, ensure_turn_off)
+        async def ensure_turn_off(call: ServiceCall) -> None:
+            """Handle ensure turn_off service."""
+            await _handle_ensure_service(hass, call, "off")
 
-    _LOGGER.info("Ensure services registered successfully")
+        hass.services.async_register(DOMAIN, SERVICE_TURN_ON, ensure_turn_on)
+        hass.services.async_register(DOMAIN, SERVICE_TURN_OFF, ensure_turn_off)
+
+        _LOGGER.info("Ensure services registered successfully")
 
 async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: str) -> None:
     """Handle the ensure service call with retry logic."""
@@ -60,7 +78,7 @@ async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: 
     await _try_original_target(hass, original_target, state, service_data)
 
     # Wait a moment for the command to propagate
-    await asyncio.sleep(1)
+    await asyncio.sleep(FIXED_INITIAL_DELAY)
 
     # Now expand to individual entities for verification/retry
     expanded_entities = _get_target_entities(hass, call)
@@ -123,11 +141,14 @@ def _get_original_target(call: ServiceCall) -> str:
 
 async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any]) -> None:
     """Ensure a single entity reaches the target state with retry logic."""
+    global _service_config
 
     domain = entity_id.split(".")[0]
     retry_count = 0
+    max_retries = _service_config[CONF_MAX_RETRIES]
+    base_timeout = _service_config[CONF_BASE_TIMEOUT]
 
-    while retry_count < DEFAULT_MAX_RETRIES:
+    while retry_count < max_retries:
         # Check if entity is already in desired state
         if await _is_entity_in_target_state(hass, entity_id, target_state, service_data):
             _LOGGER.debug(f"{entity_id} reached target state on attempt {retry_count + 1}")
@@ -136,10 +157,10 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
         retry_count += 1
 
         # Calculate timeout for this attempt
-        timeout_ms = DEFAULT_BASE_TIMEOUT + (retry_count * DEFAULT_TIMEOUT_INCREMENT)
+        timeout_ms = base_timeout + (retry_count * FIXED_TIMEOUT_INCREMENT)
         timeout_sec = timeout_ms / 1000
 
-        _LOGGER.debug(f"Retry {retry_count}/{DEFAULT_MAX_RETRIES} for {entity_id}, timeout: {timeout_sec}s")
+        _LOGGER.debug(f"Retry {retry_count}/{max_retries} for {entity_id}, timeout: {timeout_sec}s")
 
         # Call the service
         service_name = f"{domain}.turn_{target_state}"
@@ -170,15 +191,16 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
     current_state = hass.states.get(entity_id)
     current_state_value = current_state.state if current_state else "unknown"
 
-    _LOGGER.error(f"{entity_id} failed to turn {target_state} after {DEFAULT_MAX_RETRIES} attempts. Current state: {current_state_value}")
+    _LOGGER.error(f"{entity_id} failed to turn {target_state} after {max_retries} attempts. Current state: {current_state_value}")
 
-    # Create persistent notification
-    await persistent_notification.async_create(
-        hass,
-        f"{entity_id} failed to turn {target_state} after {DEFAULT_MAX_RETRIES} attempts. Current state: {current_state_value}",
-        "Device Control Failed",
-        f"device_fail_{entity_id.replace('.', '_')}"
-    )
+    # Create persistent notification if enabled
+    if _service_config[CONF_ENABLE_NOTIFICATIONS]:
+        await persistent_notification.async_create(
+            hass,
+            f"{entity_id} failed to turn {target_state} after {max_retries} attempts. Current state: {current_state_value}",
+            "Device Control Failed",
+            f"device_fail_{entity_id.replace('.', '_')}"
+        )
 
 async def _wait_for_state_change(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any]) -> None:
     """Wait for entity to reach target state."""

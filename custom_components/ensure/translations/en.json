@@ -1,0 +1,36 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Ensure Device Control",
+        "description": "Configure retry settings for reliable device control.",
+        "data": {
+          "max_retries": "Maximum retry attempts (1-10)",
+          "base_timeout": "Base timeout in milliseconds (500-5000)",
+          "enable_notifications": "Enable failure notifications"
+        }
+      }
+    },
+    "error": {
+      "invalid_retries": "Maximum retries must be between 1 and 10",
+      "invalid_timeout": "Base timeout must be between 500 and 5000 milliseconds"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ensure Device Control Options",
+        "description": "Configure retry settings for reliable device control.",
+        "data": {
+          "max_retries": "Maximum retry attempts (1-10)",
+          "base_timeout": "Base timeout in milliseconds (500-5000)",
+          "enable_notifications": "Enable failure notifications"
+        }
+      }
+    },
+    "error": {
+      "invalid_retries": "Maximum retries must be between 1 and 10",
+      "invalid_timeout": "Base timeout must be between 500 and 5000 milliseconds"
+    }
+  }
+}

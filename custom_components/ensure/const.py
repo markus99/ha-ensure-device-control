@@ -6,18 +6,25 @@ DOMAIN = "ensure"
 SERVICE_TURN_ON = "turn_on"
 SERVICE_TURN_OFF = "turn_off"
 
-# Default retry settings
+# Configuration options (user configurable)
+CONF_MAX_RETRIES = "max_retries"
+CONF_BASE_TIMEOUT = "base_timeout"
+CONF_ENABLE_NOTIFICATIONS = "enable_notifications"
+
+# Default configuration values
 DEFAULT_MAX_RETRIES = 5
 DEFAULT_BASE_TIMEOUT = 1000  # milliseconds
-DEFAULT_TIMEOUT_INCREMENT = 500  # milliseconds
+DEFAULT_ENABLE_NOTIFICATIONS = True
 
-# Tolerance settings for different attributes
-BRIGHTNESS_TOLERANCE = 5  # brightness units (0-255)
-BRIGHTNESS_PCT_TOLERANCE = 2  # percentage points
-RGB_TOLERANCE = 10  # RGB color value tolerance
-KELVIN_TOLERANCE = 20  # color temperature tolerance
-HUE_TOLERANCE = 5  # hue tolerance
-SATURATION_TOLERANCE = 5  # saturation tolerance
+# Fixed retry settings (not configurable)
+FIXED_TIMEOUT_INCREMENT = 500  # milliseconds
+FIXED_INITIAL_DELAY = 1  # seconds
+
+# Technical tolerance settings (hardcoded, not user configurable)
+BRIGHTNESS_TOLERANCE = 8  # brightness units (0-255) - ~3%
+BRIGHTNESS_PCT_TOLERANCE = 1  # percentage points
+RGB_TOLERANCE = 5  # RGB color value tolerance per channel
+KELVIN_TOLERANCE = 50  # color temperature tolerance
 
 # Supported service parameters
 SUPPORTED_FEATURES = [
