@@ -74,14 +74,17 @@ async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: 
     service_data = dict(call.data)
     service_data.pop("entity_id", None)  # Remove if present
 
+    # Expand to individual entities for conflict resolution context
+    expanded_entities = _get_target_entities(hass, call)
+
+    # Resolve parameter conflicts with priority order and add smart defaults
+    service_data = _resolve_parameter_conflicts(hass, service_data, expanded_entities, state)
+
     # Try original target first (preserves group operations for speed)
     await _try_original_target(hass, original_target, state, service_data)
 
     # Wait a moment for the command to propagate
     await asyncio.sleep(FIXED_INITIAL_DELAY)
-
-    # Now expand to individual entities for verification/retry
-    expanded_entities = _get_target_entities(hass, call)
     if not expanded_entities:
         _LOGGER.warning("No entities found after expansion")
         return
@@ -325,3 +328,59 @@ def _get_target_entities(hass: HomeAssistant, call: ServiceCall) -> List[str]:
             unique_entity_ids.append(entity_id)
 
     return unique_entity_ids
+
+def _resolve_parameter_conflicts(hass: HomeAssistant, service_data: Dict[str, Any], entity_ids: List[str], state: str) -> Dict[str, Any]:
+    """Resolve parameter conflicts using priority order and add smart defaults."""
+
+    resolved_data = dict(service_data)
+
+    # Only add defaults for 'on' operations
+    if state != "on":
+        return resolved_data
+
+    # BRIGHTNESS CONFLICT RESOLUTION (first found wins)
+    brightness_params = ["brightness_pct", "brightness"]
+    found_brightness = None
+    for param in brightness_params:
+        if param in resolved_data:
+            found_brightness = param
+            break
+
+    # Remove conflicting brightness parameters (keep only the first found)
+    if found_brightness:
+        for param in brightness_params:
+            if param != found_brightness and param in resolved_data:
+                _LOGGER.debug(f"Removing conflicting brightness parameter '{param}', keeping '{found_brightness}'")
+                resolved_data.pop(param)
+
+    # COLOR CONFLICT RESOLUTION (first found wins)
+    color_params = ["rgb_color", "hs_color", "xy_color", "color_name"]
+    found_color = None
+    for param in color_params:
+        if param in resolved_data:
+            found_color = param
+            break
+
+    # Remove conflicting color parameters (keep only the first found)
+    if found_color:
+        for param in color_params:
+            if param != found_color and param in resolved_data:
+                _LOGGER.debug(f"Removing conflicting color parameter '{param}', keeping '{found_color}'")
+                resolved_data.pop(param)
+
+    # COLOR TEMPERATURE CONFLICT RESOLUTION
+    kelvin_params = ["color_temp_kelvin", "kelvin"]
+    found_kelvin = None
+    for param in kelvin_params:
+        if param in resolved_data:
+            found_kelvin = param
+            break
+
+    # Remove conflicting kelvin parameters (keep only the first found)
+    if found_kelvin:
+        for param in kelvin_params:
+            if param != found_kelvin and param in resolved_data:
+                _LOGGER.debug(f"Removing conflicting kelvin parameter '{param}', keeping '{found_kelvin}'")
+                resolved_data.pop(param)
+
+    return resolved_data

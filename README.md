@@ -47,10 +47,38 @@ The integration will automatically retry up to 5 times with increasing delays if
 
 All standard Home Assistant parameters are supported:
 - `brightness` / `brightness_pct`
-- `rgb_color`
-- `color_name`
-- `color_temp_kelvin`
+- `rgb_color` / `hs_color` / `xy_color` / `color_name`
+- `color_temp_kelvin` / `kelvin`
+- `transition` (Light Transition Timing)
+- `effect` / `flash`
 - And more...
+
+### Parameter Conflict Resolution
+
+If you specify conflicting parameters, the integration uses priority order (first found wins):
+
+**Brightness**: `brightness_pct` > `brightness`
+```yaml
+data:
+  brightness_pct: 75  # This wins
+  brightness: 100     # This gets removed
+```
+
+**Color**: `rgb_color` > `hs_color` > `xy_color` > `color_name`
+```yaml
+data:
+  rgb_color: [255, 0, 0]  # This wins (red)
+  color_name: "blue"      # This gets removed
+```
+
+**Temperature**: `color_temp_kelvin` > `kelvin`
+```yaml
+data:
+  color_temp_kelvin: 3000  # This wins
+  kelvin: 4000             # This gets removed
+```
+
+**No Defaults Added**: The integration only removes conflicts - it doesn't add default values. If you don't specify brightness, the device keeps its current brightness.
 
 ## Installation
 
