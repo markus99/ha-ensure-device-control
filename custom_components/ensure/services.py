@@ -93,7 +93,7 @@ async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: 
 
     # Process each individual entity with retry logic (queued mode)
     for entity_id in expanded_entities:
-        await _ensure_entity_state(hass, entity_id, state, service_data)
+        await _ensure_entity_state(hass, entity_id, state, service_data, original_target)
 
 async def _try_original_target(hass: HomeAssistant, original_target: str, state: str, service_data: Dict[str, Any]) -> None:
     """Try the original target as-is (matching original script logic)."""
@@ -144,7 +144,7 @@ def _get_original_target(call: ServiceCall) -> str:
 
     return None
 
-async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any]) -> None:
+async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any], original_target: str = None) -> None:
     """Ensure a single entity reaches the target state with retry logic."""
     global _service_config
 
@@ -206,10 +206,18 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
 
     # Create persistent notification if enabled
     if _service_config[CONF_ENABLE_NOTIFICATIONS]:
+        # Create more specific message if this was part of a group operation
+        if original_target and original_target != entity_id and 'group' in original_target:
+            message = f"Device {entity_id} (from group {original_target}) failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}"
+            title = "Ensure Device Control Failed (Group Member)"
+        else:
+            message = f"{entity_id} failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}"
+            title = "Ensure Device Control Failed"
+
         await persistent_notification.async_create(
             hass,
-            f"{entity_id} failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}",
-            "Ensure Device Control Failed",
+            message,
+            title,
             f"device_fail_{entity_id.replace('.', '_')}"
         )
 
