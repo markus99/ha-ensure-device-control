@@ -42,5 +42,5 @@ SUPPORTED_FEATURES = [
     "color_temp",
     "effect",
     "flash",
-    "transition"
+    "transition"  # Light transition timing (seconds for smooth fade)
 ]

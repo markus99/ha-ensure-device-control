@@ -238,8 +238,8 @@ turn_on:
             - "long"
             - "short"
     transition:
-      name: Transition
-      description: Duration it takes to get to next state.
+      name: Light Transition Timing
+      description: Duration in seconds for smooth fade to next state (0 = instant).
       selector:
         number:
           min: 0
@@ -259,8 +259,8 @@ turn_off:
         - climate
   fields:
     transition:
-      name: Transition
-      description: Duration it takes to get to next state.
+      name: Light Transition Timing
+      description: Duration in seconds for smooth fade to next state (0 = instant).
       selector:
         number:
           min: 0
