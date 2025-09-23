@@ -2,7 +2,11 @@ turn_on:
   name: Turn on with retry
   description: Reliably turn on devices with retry logic and state verification
   target:
-    entity: {}
+    entity:
+      domain:
+        - light
+        - switch
+        - group
   fields:
     brightness:
       name: Brightness
@@ -244,7 +248,11 @@ turn_off:
   name: Turn off with retry
   description: Reliably turn off devices with retry logic and state verification
   target:
-    entity: {}
+    entity:
+      domain:
+        - light
+        - switch
+        - group
   fields:
     transition:
       name: Light Transition Timing
