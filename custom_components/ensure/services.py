@@ -191,14 +191,14 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
     current_state = hass.states.get(entity_id)
     current_state_value = current_state.state if current_state else "unknown"
 
-    _LOGGER.error(f"{entity_id} failed to turn {target_state} after {max_retries} attempts. Current state: {current_state_value}")
+    _LOGGER.error(f"{entity_id} failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}")
 
     # Create persistent notification if enabled
     if _service_config[CONF_ENABLE_NOTIFICATIONS]:
         await persistent_notification.async_create(
             hass,
-            f"{entity_id} failed to turn {target_state} after {max_retries} attempts. Current state: {current_state_value}",
-            "Device Control Failed",
+            f"{entity_id} failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}",
+            "Ensure Device Control Failed",
             f"device_fail_{entity_id.replace('.', '_')}"
         )
 
