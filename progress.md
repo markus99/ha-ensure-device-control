@@ -165,11 +165,41 @@ All necessary files have been created as artifacts in our conversation:
 - **Failure notifications**: Persistent notifications on ultimate failure
 - **Debug logging**: Comprehensive logging for troubleshooting
 
-## User's Original Files Preserved
+## Critical Implementation Note: Group Handling and Speed
 
-- **scripts.yaml** - Contains all original working scripts (ensure_device_changes, brightness, RGB, etc.)
-- **automation.yaml** - Contains original automations that call these scripts
-- These serve as reference and backup of the proven working logic
+**IMPORTANT**: The current Python code has a mismatch with the original script logic that needs correction:
+
+### Original Script Logic (Correct):
+```yaml
+service_template: |-
+  {% if 'group' in device %}
+    homeassistant.turn_{{ state }}
+  {% else %}
+    {{ device.split('.').0 }}.turn_{{ state }}
+  {% endif %}
+```
+
+### What This Means:
+- **If INPUT contains 'group'** → use `homeassistant.turn_on` (faster, bulk operation)
+- **Otherwise** → use domain-specific service (`light.turn_on`, `switch.turn_on`, etc.)
+
+### Current Python Code Issue:
+The Python code checks each **individual entity's domain** instead of the **original input**. This breaks the logic.
+
+### Goal: SPEED + CONFIRMATION
+1. **SPEED**: Try the fastest method first (bulk operations when possible)
+2. **CONFIRMATION**: Then verify each individual device actually changed state
+3. **Group expansion**: Only happens for the individual retry verification phase
+
+### Correct Flow Should Be:
+1. **Try original input as-is** (group operation if it's a group)
+2. **Wait 1 second** for propagation
+3. **Expand groups into individual entities**
+4. **Retry individual entities** that didn't reach target state
+
+### Files Reference:
+- **scripts.yaml** - Original working logic for group handling
+- **automation.yaml** - Examples of how groups were called
 
 ## Service Design Preferences
 
