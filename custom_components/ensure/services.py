@@ -477,13 +477,8 @@ async def _background_retry(hass: HomeAssistant, entity_id: str, target_state: s
         # Attempt the retry with full retry logic, but avoid infinite background retries
         await _ensure_entity_state_no_background(hass, entity_id, target_state, service_data, original_target)
 
-        # If successful, show success notification
-        await persistent_notification.async_create(
-            hass,
-            f"✅ Background retry successful: {entity_id} is now {target_state.upper()}",
-            "Ensure Device Control - Success",
-            f"device_success_{entity_id.replace('.', '_')}"
-        )
+        # If successful, just log it (no notification for success)
+        _LOGGER.info(f"Background retry successful: {entity_id} is now {target_state.upper()}")
 
     except Exception as e:
         _LOGGER.error(f"Background retry failed for {entity_id}: {e}")
