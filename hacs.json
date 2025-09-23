@@ -1,5 +1,5 @@
 {
-  "name": "Ensure Device Control (BETA)",
+  "name": "Ensure Device Control",
   "content_in_root": false,
   "filename": "ensure",
   "country": ["US"],
@@ -8,5 +8,5 @@
   "domains": ["ensure"],
   "iot_class": "Local Polling",
   "version": "0.3.0",
-  "icon": "custom_components/ensure/icon.png"
+  "icon": "icon.png"
 }
