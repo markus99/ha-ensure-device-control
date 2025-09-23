@@ -117,9 +117,27 @@ async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: 
 
     _LOGGER.debug(f"Expanded to individual entities: {expanded_entities}")
 
-    # Process each individual entity with retry logic (queued mode)
-    for entity_id in expanded_entities:
-        await _ensure_entity_state(hass, entity_id, state, service_data, original_target)
+    # Process entities concurrently with controlled rate limiting
+    await _process_entities_concurrently(hass, expanded_entities, state, service_data, original_target)
+
+async def _process_entities_concurrently(hass: HomeAssistant, entity_ids: List[str], state: str, service_data: Dict[str, Any], original_target: str) -> None:
+    """Process entities concurrently with rate limiting to avoid overwhelming the hub."""
+    if not entity_ids:
+        return
+
+    # Limit concurrent operations to avoid overwhelming Hubitat/integrations
+    semaphore = asyncio.Semaphore(3)  # Max 3 concurrent operations
+
+    async def process_single_entity(entity_id: str) -> None:
+        async with semaphore:
+            try:
+                await _ensure_entity_state(hass, entity_id, state, service_data, original_target)
+            except Exception as e:
+                _LOGGER.error(f"Error processing entity {entity_id}: {e}")
+
+    # Create tasks for all entities and run them concurrently
+    tasks = [process_single_entity(entity_id) for entity_id in entity_ids]
+    await asyncio.gather(*tasks, return_exceptions=True)
 
 async def _try_original_target(hass: HomeAssistant, original_target: str, state: str, service_data: Dict[str, Any]) -> None:
     """Try the original target as-is (matching original script logic)."""
@@ -172,6 +190,10 @@ def _get_original_target(call: ServiceCall) -> str:
 
 async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any], original_target: str = None) -> None:
     """Ensure a single entity reaches the target state with retry logic."""
+    await _ensure_entity_state_core(hass, entity_id, target_state, service_data, original_target, allow_background_retry=True)
+
+async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any], original_target: str = None, allow_background_retry: bool = True) -> None:
+    """Core retry logic with configurable background retry behavior."""
     global _service_config
 
     domain = entity_id.split(".")[0]
@@ -198,7 +220,6 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
         _LOGGER.debug(f"Retry {retry_count}/{max_retries} for {entity_id}, timeout: {timeout_sec}s")
 
         # Call the service
-        service_name = f"{domain}.turn_{target_state}"
         data = {"entity_id": entity_id}
         if service_data:
             # Filter out ensure-specific parameters that shouldn't go to the device
@@ -230,8 +251,8 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
 
     _LOGGER.error(f"{entity_id} failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}")
 
-    # Handle notification and background retry logic
-    if _service_config[CONF_ENABLE_NOTIFICATIONS]:
+    # Handle notification and background retry logic (only if allowed)
+    if allow_background_retry and _service_config[CONF_ENABLE_NOTIFICATIONS]:
         background_delay = _service_config[CONF_BACKGROUND_RETRY_DELAY]
 
         # If background retry is disabled (threshold+), notify immediately
@@ -244,6 +265,9 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
             hass.async_create_task(
                 _background_retry(hass, entity_id, target_state, service_data, original_target, background_delay, max_retries)
             )
+    elif not allow_background_retry:
+        # This is a background retry that failed - raise exception for caller to handle
+        raise Exception(f"Retry failed after {max_retries} attempts")
 
 async def _wait_for_state_change(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any]) -> None:
     """Wait for entity to reach target state."""
@@ -370,75 +394,44 @@ def _get_target_entities(hass: HomeAssistant, call: ServiceCall) -> List[str]:
     return unique_entity_ids
 
 def _resolve_parameter_conflicts(hass: HomeAssistant, service_data: Dict[str, Any], entity_ids: List[str], state: str) -> Dict[str, Any]:
-    """Resolve parameter conflicts using priority order and add smart defaults."""
-
+    """Resolve parameter conflicts using priority order."""
     resolved_data = dict(service_data)
 
-    # Only add defaults for 'on' operations
+    # Only resolve conflicts for 'on' operations
     if state != "on":
         return resolved_data
 
-    # BRIGHTNESS CONFLICT RESOLUTION (first found wins)
-    brightness_params = ["brightness_pct", "brightness"]
-    found_brightness = None
-    for param in brightness_params:
-        if param in resolved_data:
-            found_brightness = param
-            break
+    # Define conflict groups with priority order (first has highest priority)
+    conflict_groups = {
+        'brightness': ["brightness_pct", "brightness"],
+        'color': ["rgb_color", "hs_color", "xy_color", "color_name"],
+        'temperature': ["color_temp_kelvin", "kelvin"],
+        'speed': ["speed_pct", "speed"]
+    }
 
-    # Remove conflicting brightness parameters (keep only the first found)
-    if found_brightness:
-        for param in brightness_params:
-            if param != found_brightness and param in resolved_data:
-                _LOGGER.debug(f"Removing conflicting brightness parameter '{param}', keeping '{found_brightness}'")
-                resolved_data.pop(param)
-
-    # COLOR CONFLICT RESOLUTION (first found wins)
-    color_params = ["rgb_color", "hs_color", "xy_color", "color_name"]
-    found_color = None
-    for param in color_params:
-        if param in resolved_data:
-            found_color = param
-            break
-
-    # Remove conflicting color parameters (keep only the first found)
-    if found_color:
-        for param in color_params:
-            if param != found_color and param in resolved_data:
-                _LOGGER.debug(f"Removing conflicting color parameter '{param}', keeping '{found_color}'")
-                resolved_data.pop(param)
-
-    # COLOR TEMPERATURE CONFLICT RESOLUTION
-    kelvin_params = ["color_temp_kelvin", "kelvin"]
-    found_kelvin = None
-    for param in kelvin_params:
-        if param in resolved_data:
-            found_kelvin = param
-            break
-
-    # Remove conflicting kelvin parameters (keep only the first found)
-    if found_kelvin:
-        for param in kelvin_params:
-            if param != found_kelvin and param in resolved_data:
-                _LOGGER.debug(f"Removing conflicting kelvin parameter '{param}', keeping '{found_kelvin}'")
-                resolved_data.pop(param)
-
-    # FAN SPEED CONFLICT RESOLUTION
-    speed_params = ["speed_pct", "speed"]
-    found_speed = None
-    for param in speed_params:
-        if param in resolved_data:
-            found_speed = param
-            break
-
-    # Remove conflicting speed parameters (keep only the first found)
-    if found_speed:
-        for param in speed_params:
-            if param != found_speed and param in resolved_data:
-                _LOGGER.debug(f"Removing conflicting fan speed parameter '{param}', keeping '{found_speed}'")
-                resolved_data.pop(param)
+    # Resolve each conflict group
+    for group_name, params in conflict_groups.items():
+        resolved_data = _resolve_conflict_group(resolved_data, params, group_name)
 
     return resolved_data
+
+def _resolve_conflict_group(data: Dict[str, Any], params: List[str], group_name: str) -> Dict[str, Any]:
+    """Resolve conflicts within a parameter group using priority order."""
+    # Find the first parameter present (highest priority)
+    found_param = None
+    for param in params:
+        if param in data:
+            found_param = param
+            break
+
+    # Remove all other conflicting parameters
+    if found_param:
+        for param in params:
+            if param != found_param and param in data:
+                _LOGGER.debug(f"Removing conflicting {group_name} parameter '{param}', keeping '{found_param}'")
+                data.pop(param)
+
+    return data
 
 async def _create_failure_notification(hass: HomeAssistant, entity_id: str, target_state: str, max_retries: int, current_state_value: str, original_target: str = None, immediate: bool = False) -> None:
     """Create a failure notification with appropriate message."""
@@ -478,7 +471,7 @@ async def _background_retry(hass: HomeAssistant, entity_id: str, target_state: s
 
     try:
         # Attempt the retry with full retry logic, but avoid infinite background retries
-        await _ensure_entity_state_no_background(hass, entity_id, target_state, service_data, original_target)
+        await _ensure_entity_state_core(hass, entity_id, target_state, service_data, original_target, allow_background_retry=False)
 
         # If successful, just log it (no notification for success)
         _LOGGER.info(f"Background retry successful: {entity_id} is now {target_state.upper()}")
@@ -493,57 +486,3 @@ async def _background_retry(hass: HomeAssistant, entity_id: str, target_state: s
         if _service_config[CONF_ENABLE_NOTIFICATIONS]:
             await _create_failure_notification(hass, entity_id, target_state, original_max_retries, current_state_value, original_target, immediate=False)
 
-async def _ensure_entity_state_no_background(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any], original_target: str = None) -> None:
-    """Ensure entity state with retry logic but without background retry (prevents infinite loops)."""
-    global _service_config
-
-    domain = entity_id.split(".")[0]
-    retry_count = 0
-    max_retries = _service_config[CONF_MAX_RETRIES]
-
-    # Use delay parameter override if provided, otherwise use configured base timeout
-    base_timeout = service_data.get("delay", _service_config[CONF_BASE_TIMEOUT])
-
-    while retry_count < max_retries:
-        # Check if entity is already in desired state
-        if await _is_entity_in_target_state(hass, entity_id, target_state, service_data):
-            _LOGGER.debug(f"{entity_id} reached target state on background retry attempt {retry_count + 1}")
-            return
-
-        retry_count += 1
-
-        # Calculate timeout for this attempt
-        timeout_ms = base_timeout + (retry_count * FIXED_TIMEOUT_INCREMENT)
-        timeout_sec = timeout_ms / 1000
-
-        _LOGGER.debug(f"Background retry {retry_count}/{max_retries} for {entity_id}, timeout: {timeout_sec}s")
-
-        # Call the service
-        data = {"entity_id": entity_id}
-        if service_data:
-            # Filter out ensure-specific parameters that shouldn't go to the device
-            filtered_data = {k: v for k, v in service_data.items() if k != "delay"}
-            data.update(filtered_data)
-
-        try:
-            await hass.services.async_call(
-                domain,
-                f"turn_{target_state}",
-                data
-            )
-        except Exception as e:
-            _LOGGER.warning(f"Background retry service call failed for {entity_id} on attempt {retry_count}: {e}")
-
-        # Wait for state change with timeout
-        try:
-            await asyncio.wait_for(
-                _wait_for_state_change(hass, entity_id, target_state, service_data),
-                timeout=timeout_sec
-            )
-        except asyncio.TimeoutError:
-            _LOGGER.debug(f"Background retry timeout waiting for {entity_id} state change on attempt {retry_count}")
-            continue
-
-    # If we get here, background retry failed too
-    _LOGGER.error(f"Background retry failed for {entity_id} after {max_retries} attempts")
-    raise Exception(f"Background retry failed after {max_retries} attempts")
