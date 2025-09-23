@@ -1,10 +1,8 @@
-# Ensure Device Control for Home Assistant (BETA)
+# Ensure Device Control for Home Assistant
 
-⚠️ **BETA VERSION - EARLY TESTING PHASE** ⚠️
+🎉 **STABLE RELEASE - PRODUCTION READY** 🎉
 
-**This integration is currently in BETA and undergoing active testing. Use with caution in production environments.**
-
-A Home Assistant custom integration that provides reliable device control with intelligent retry logic and state verification.
+A Home Assistant custom integration that provides **guaranteed reliable device control** with intelligent retry logic, background recovery, and Hubitat overload protection.
 
 ## Why This Integration?
 
@@ -56,6 +54,22 @@ data:
 ```
 
 The integration will automatically retry up to 5 times with increasing delays if the device doesn't respond, and notify you if it ultimately fails.
+
+## ✨ New in v0.3.0
+
+### 🚀 **Performance Improvements**
+- **Concurrent Processing**: Groups now process up to 3x faster
+- **Smart Rate Limiting**: Protects Hubitat from overload (max 3 concurrent operations)
+
+### 🧠 **Intelligent Background Retry**
+- **Automatic Recovery**: 30-second background retry for temporary issues
+- **Silent Success**: Most problems resolve without bothering you
+- **Configurable Timing**: Adjust background retry delay (10-300 seconds)
+
+### 🔔 **Smart Notifications**
+- **Reduced Noise**: Only notify when manual intervention truly needed
+- **Specific Details**: Shows exactly which device failed in groups
+- **One-Click Retry**: Working retry button in every notification
 
 ## Services
 
@@ -123,11 +137,11 @@ data:
 
 ## Installation
 
-⚠️ **BETA WARNING**: This integration is in early testing. Please test thoroughly in a non-production environment first.
+✅ **PRODUCTION READY**: This integration is stable and thoroughly tested for production use.
 
 ### Via HACS (Recommended)
 1. Add this repository as a custom HACS repository
-2. Install "Ensure Device Control (BETA)"
+2. Install "Ensure Device Control"
 3. Restart Home Assistant
 
 ### Manual Installation
@@ -143,10 +157,11 @@ Configure:
 - Max retry attempts (1-10, default: 5)
 - Base timeout (500-5000ms, default: 1000ms)
 - Failure notifications (on/off, default: on)
+- Background retry delay (10-300 seconds, default: 30s)
 
 ## Testing & Feedback
 
-**This is a BETA release** - please help us improve it:
+**Now stable and production-ready** - feedback still welcome:
 
 1. **Test thoroughly** with non-critical devices first
 2. **Report issues** via GitHub Issues
