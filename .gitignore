@@ -3,8 +3,9 @@ scripts.yaml
 automation.yaml
 progress.md
 
-# Screenshots and temp files
+# Screenshots and temp files (but allow integration icon)
 *.png
+!custom_components/ensure/icon.png
 
 # Python
 __pycache__/
