@@ -332,11 +332,9 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
 
     domain = entity_id.split(".")[0]
 
-    # Use homeassistant domain for groups since group.turn_on doesn't exist
-    if domain == "group":
-        service_domain = "homeassistant"
-    else:
-        service_domain = domain
+    # In retry loop, we're dealing with individual entities, so always use their actual domain
+    # (This matches original script where the retry loop uses device_1.split('.')[0].turn_state)
+    service_domain = domain
 
     retry_count = 0
     max_retries = _service_config[CONF_MAX_RETRIES]
