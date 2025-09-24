@@ -5,6 +5,7 @@ DOMAIN = "ensure"
 # Service names
 SERVICE_TURN_ON = "turn_on"
 SERVICE_TURN_OFF = "turn_off"
+SERVICE_TOGGLE = "toggle"
 
 # Configuration options (user configurable)
 CONF_MAX_RETRIES = "max_retries"

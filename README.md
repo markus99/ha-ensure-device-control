@@ -51,6 +51,13 @@ target:
   entity_id: group.living_room_lights
 data:
   brightness_pct: 80
+
+# Toggle devices - turn on if off, turn off if on
+action: ensure.toggle
+target:
+  entity_id: light.kitchen
+data:
+  brightness_pct: 90  # Used when turning ON
 ```
 
 The integration will automatically retry up to 5 times with increasing delays if the device doesn't respond, and notify you if it ultimately fails.
@@ -75,6 +82,7 @@ The integration will automatically retry up to 5 times with increasing delays if
 
 - `ensure.turn_on` - Reliably turn on devices with full parameter support
 - `ensure.turn_off` - Reliably turn off devices
+- `ensure.toggle` - Reliably toggle devices (turn on if off, turn off if on)
 
 ## Supported Parameters
 

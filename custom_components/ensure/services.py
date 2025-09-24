@@ -12,6 +12,7 @@ from .const import (
     DOMAIN,
     SERVICE_TURN_ON,
     SERVICE_TURN_OFF,
+    SERVICE_TOGGLE,
     CONF_MAX_RETRIES,
     CONF_BASE_TIMEOUT,
     CONF_ENABLE_NOTIFICATIONS,
@@ -87,6 +88,10 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
             """Handle ensure turn_off service."""
             await _handle_ensure_service(hass, call, "off")
 
+        async def ensure_toggle(call: ServiceCall) -> None:
+            """Handle ensure toggle service."""
+            await _handle_ensure_toggle_service(hass, call)
+
         async def retry_failed_device(call: ServiceCall) -> None:
             """Retry a previously failed device."""
             entity_id = call.data.get("entity_id")
@@ -108,6 +113,7 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
 
         hass.services.async_register(DOMAIN, SERVICE_TURN_ON, ensure_turn_on)
         hass.services.async_register(DOMAIN, SERVICE_TURN_OFF, ensure_turn_off)
+        hass.services.async_register(DOMAIN, SERVICE_TOGGLE, ensure_toggle)
         hass.services.async_register(DOMAIN, "retry_failed_device", retry_failed_device)
 
         # Use standard logger during setup to prevent issues
@@ -147,6 +153,55 @@ async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: 
 
     # Process entities concurrently with controlled rate limiting
     await _process_entities_concurrently(hass, expanded_entities, state, service_data, original_target)
+
+async def _handle_ensure_toggle_service(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Handle the ensure toggle service call with retry logic."""
+
+    # Get original input for first attempt (preserves groups)
+    original_target = _get_original_target(call)
+    if not original_target:
+        raise ServiceValidationError("No entities specified")
+
+    _log(LOGGING_LEVEL_NORMAL, f"🎯 Ensure toggle called for: {original_target}")
+    _log(LOGGING_LEVEL_VERBOSE, f"Service call data: {call.data}")
+
+    # Get service data
+    service_data = dict(call.data)
+    service_data.pop("entity_id", None)  # Remove if present
+
+    # Expand to individual entities to check their current states
+    expanded_entities = _get_target_entities(hass, call)
+    if not expanded_entities:
+        _log(LOGGING_LEVEL_MINIMAL, "❌ No entities found for toggle operation")
+        return
+
+    _log(LOGGING_LEVEL_VERBOSE, f"Expanded entities for toggle: {expanded_entities}")
+
+    # For toggle, we need to determine the target state for each entity individually
+    # Check current state of each entity and create separate on/off lists
+    entities_to_turn_on = []
+    entities_to_turn_off = []
+
+    for entity_id in expanded_entities:
+        current_state = hass.states.get(entity_id)
+        if not current_state:
+            _log(LOGGING_LEVEL_VERBOSE, f"⚠️ {entity_id}: No state found, assuming off -> will turn on")
+            entities_to_turn_on.append(entity_id)
+        elif current_state.state in ["on", "open"]:
+            _log(LOGGING_LEVEL_VERBOSE, f"🔛 {entity_id}: Currently {current_state.state} -> will turn off")
+            entities_to_turn_off.append(entity_id)
+        else:
+            _log(LOGGING_LEVEL_VERBOSE, f"🔲 {entity_id}: Currently {current_state.state} -> will turn on")
+            entities_to_turn_on.append(entity_id)
+
+    # Process each group with their respective target states
+    if entities_to_turn_on:
+        _log(LOGGING_LEVEL_NORMAL, f"🔛 Toggle ON: {entities_to_turn_on}")
+        await _process_entities_concurrently(hass, entities_to_turn_on, "on", service_data, original_target)
+
+    if entities_to_turn_off:
+        _log(LOGGING_LEVEL_NORMAL, f"🔲 Toggle OFF: {entities_to_turn_off}")
+        await _process_entities_concurrently(hass, entities_to_turn_off, "off", service_data, original_target)
 
 async def _process_entities_concurrently(hass: HomeAssistant, entity_ids: List[str], state: str, service_data: Dict[str, Any], original_target: str) -> None:
     """Process entities concurrently with rate limiting to avoid overwhelming the hub."""

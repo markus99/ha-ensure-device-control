@@ -58,6 +58,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if len(hass.data[DOMAIN]) == 1:
         hass.services.async_remove(DOMAIN, "turn_on")
         hass.services.async_remove(DOMAIN, "turn_off")
+        hass.services.async_remove(DOMAIN, "toggle")
         hass.services.async_remove(DOMAIN, "retry_failed_device")
 
     # Remove config data
