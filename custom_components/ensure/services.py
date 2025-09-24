@@ -452,6 +452,7 @@ def _check_attribute_tolerances(entity_id: str, state, service_data: Dict[str, A
     """Check if entity attributes match target values within tolerance."""
 
     attributes = state.attributes
+    _log(LOGGING_LEVEL_VERBOSE, f"🔍 {entity_id}: Checking attributes for parameters: {list(service_data.keys())}")
 
     # Check brightness
     if "brightness" in service_data:
@@ -471,10 +472,13 @@ def _check_attribute_tolerances(entity_id: str, state, service_data: Dict[str, A
     if "rgb_color" in service_data:
         target_rgb = service_data["rgb_color"]
         actual_rgb = attributes.get("rgb_color")
+        _log(LOGGING_LEVEL_VERBOSE, f"🎨 {entity_id}: RGB check - target: {target_rgb}, actual: {actual_rgb}")
         if actual_rgb and len(target_rgb) == 3 and len(actual_rgb) == 3:
             for i in range(3):
                 if abs(actual_rgb[i] - target_rgb[i]) > RGB_TOLERANCE:
+                    _log(LOGGING_LEVEL_VERBOSE, f"❌ {entity_id}: RGB mismatch - channel {i}: target {target_rgb[i]}, actual {actual_rgb[i]}, diff {abs(actual_rgb[i] - target_rgb[i])}")
                     return False
+            _log(LOGGING_LEVEL_VERBOSE, f"✅ {entity_id}: RGB values match within tolerance")
         elif not actual_rgb:
             # Many lights don't report RGB back accurately - if light is on, assume RGB worked
             _log(LOGGING_LEVEL_VERBOSE, f"⚠️ {entity_id}: RGB not reported back, assuming command succeeded")
