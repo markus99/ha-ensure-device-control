@@ -46,6 +46,36 @@ KELVIN_TOLERANCE = 50  # color temperature tolerance
 HUE_TOLERANCE = 5  # degrees (0-360)
 SATURATION_TOLERANCE = 5  # percentage points (0-100)
 
+# Color name to RGB mapping (from Home Assistant standard colors)
+COLOR_NAME_TO_RGB = {
+    "homeassistant": [3, 169, 244],
+    "aliceblue": [240, 248, 255],
+    "antiquewhite": [250, 235, 215],
+    "aqua": [0, 255, 255],
+    "aquamarine": [127, 255, 212],
+    "azure": [240, 255, 255],
+    "beige": [245, 245, 220],
+    "bisque": [255, 228, 196],
+    "blue": [0, 0, 255],
+    "brown": [165, 42, 42],
+    "coral": [255, 127, 80],
+    "cyan": [0, 255, 255],
+    "gold": [255, 215, 0],
+    "gray": [128, 128, 128],
+    "grey": [128, 128, 128],
+    "green": [0, 128, 0],
+    "lime": [0, 255, 0],
+    "magenta": [255, 0, 255],
+    "navy": [0, 0, 128],
+    "orange": [255, 165, 0],
+    "pink": [255, 192, 203],
+    "purple": [128, 0, 128],
+    "red": [255, 0, 0],
+    "silver": [192, 192, 192],
+    "white": [255, 255, 255],
+    "yellow": [255, 255, 0],
+}
+
 # Supported service parameters
 SUPPORTED_FEATURES = [
     "brightness",

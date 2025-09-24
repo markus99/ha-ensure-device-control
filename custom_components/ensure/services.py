@@ -38,6 +38,7 @@ from .const import (
     HUE_TOLERANCE,
     SATURATION_TOLERANCE,
     SUPPORTED_FEATURES,
+    COLOR_NAME_TO_RGB,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -509,9 +510,20 @@ def _check_attribute_tolerances(entity_id: str, state, service_data: Dict[str, A
     # Check color name
     if "color_name" in service_data:
         target_color_name = service_data["color_name"]
-        # Color names are converted to other formats by HA, so if light is on, assume it worked
-        # We can't reliably validate color names since HA converts them to RGB/HS internally
-        _log(LOGGING_LEVEL_VERBOSE, f"🎨 {entity_id}: Color name '{target_color_name}' requested - assuming command succeeded since light is ON")
+        if target_color_name in COLOR_NAME_TO_RGB:
+            target_rgb = COLOR_NAME_TO_RGB[target_color_name]
+            actual_rgb = attributes.get("rgb_color")
+            _log(LOGGING_LEVEL_VERBOSE, f"🎨 {entity_id}: Color name '{target_color_name}' -> RGB {target_rgb}, actual: {actual_rgb}")
+            if actual_rgb and len(actual_rgb) == 3:
+                for i in range(3):
+                    if abs(actual_rgb[i] - target_rgb[i]) > RGB_TOLERANCE:
+                        _log(LOGGING_LEVEL_VERBOSE, f"❌ {entity_id}: Color name RGB mismatch - channel {i}: target {target_rgb[i]}, actual {actual_rgb[i]}, diff {abs(actual_rgb[i] - target_rgb[i])}")
+                        return False
+                _log(LOGGING_LEVEL_VERBOSE, f"✅ {entity_id}: Color name RGB values match within tolerance")
+            elif not actual_rgb:
+                _log(LOGGING_LEVEL_VERBOSE, f"⚠️ {entity_id}: Color name '{target_color_name}' set but RGB not reported back, assuming command succeeded")
+        else:
+            _log(LOGGING_LEVEL_VERBOSE, f"⚠️ {entity_id}: Unknown color name '{target_color_name}', assuming command succeeded")
 
     return True
 
