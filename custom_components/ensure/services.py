@@ -13,6 +13,7 @@ from .const import (
     SERVICE_TURN_ON,
     SERVICE_TURN_OFF,
     SERVICE_TOGGLE,
+    SERVICE_TOGGLE_GROUP,
     CONF_MAX_RETRIES,
     CONF_BASE_TIMEOUT,
     CONF_ENABLE_NOTIFICATIONS,
@@ -92,6 +93,10 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
             """Handle ensure toggle service."""
             await _handle_ensure_toggle_service(hass, call)
 
+        async def ensure_toggle_group(call: ServiceCall) -> None:
+            """Handle ensure toggle_group service."""
+            await _handle_ensure_toggle_group_service(hass, call)
+
         async def retry_failed_device(call: ServiceCall) -> None:
             """Retry a previously failed device."""
             entity_id = call.data.get("entity_id")
@@ -114,6 +119,7 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
         hass.services.async_register(DOMAIN, SERVICE_TURN_ON, ensure_turn_on)
         hass.services.async_register(DOMAIN, SERVICE_TURN_OFF, ensure_turn_off)
         hass.services.async_register(DOMAIN, SERVICE_TOGGLE, ensure_toggle)
+        hass.services.async_register(DOMAIN, SERVICE_TOGGLE_GROUP, ensure_toggle_group)
         hass.services.async_register(DOMAIN, "retry_failed_device", retry_failed_device)
 
         # Use standard logger during setup to prevent issues
@@ -202,6 +208,50 @@ async def _handle_ensure_toggle_service(hass: HomeAssistant, call: ServiceCall) 
     if entities_to_turn_off:
         _log(LOGGING_LEVEL_NORMAL, f"🔲 Toggle OFF: {entities_to_turn_off}")
         await _process_entities_concurrently(hass, entities_to_turn_off, "off", service_data, original_target)
+
+async def _handle_ensure_toggle_group_service(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Handle the ensure toggle_group service call - mirrors HA toggle behavior with retry logic."""
+
+    # Get original input for first attempt (preserves groups)
+    original_target = _get_original_target(call)
+    if not original_target:
+        raise ServiceValidationError("No entities specified")
+
+    _log(LOGGING_LEVEL_NORMAL, f"🎯 Ensure toggle_group called for: {original_target}")
+    _log(LOGGING_LEVEL_VERBOSE, f"Service call data: {call.data}")
+
+    # Get service data
+    service_data = dict(call.data)
+    service_data.pop("entity_id", None)  # Remove if present
+
+    # Expand to individual entities
+    expanded_entities = _get_target_entities(hass, call)
+    if not expanded_entities:
+        _log(LOGGING_LEVEL_MINIMAL, "❌ No entities found for toggle_group operation")
+        return
+
+    _log(LOGGING_LEVEL_VERBOSE, f"Expanded entities for toggle_group: {expanded_entities}")
+
+    # Determine group state using Home Assistant's logic:
+    # Group is "on" if ANY entity is on, "off" only if ALL entities are off
+    group_is_on = False
+    entity_states = []
+
+    for entity_id in expanded_entities:
+        current_state = hass.states.get(entity_id)
+        if current_state and current_state.state in ["on", "open"]:
+            group_is_on = True
+            entity_states.append(f"{entity_id}=ON")
+        else:
+            entity_states.append(f"{entity_id}=OFF")
+
+    target_state = "off" if group_is_on else "on"
+
+    _log(LOGGING_LEVEL_NORMAL, f"📊 Group state analysis: {', '.join(entity_states)}")
+    _log(LOGGING_LEVEL_NORMAL, f"🎯 Group considered {'ON' if group_is_on else 'OFF'} → All entities will turn {target_state.upper()}")
+
+    # Apply the same action to all entities (like HA's standard toggle)
+    await _process_entities_concurrently(hass, expanded_entities, target_state, service_data, original_target)
 
 async def _process_entities_concurrently(hass: HomeAssistant, entity_ids: List[str], state: str, service_data: Dict[str, Any], original_target: str) -> None:
     """Process entities concurrently with rate limiting to avoid overwhelming the hub."""

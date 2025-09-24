@@ -490,6 +490,79 @@ toggle:
           max: 300
           unit_of_measurement: s
 
+toggle_group:
+  name: Toggle group with retry
+  description: Reliably toggle devices as a group (mirrors Home Assistant toggle behavior - if any entity is on, turn all off; if all are off, turn all on) with retry logic
+  target:
+    entity:
+      domain:
+        - light
+        - switch
+        - fan
+        - group
+  fields:
+    brightness:
+      name: Brightness
+      description: Number indicating brightness when turning lights on, where 0 turns the light off, 1 is the minimum brightness and 255 is the maximum brightness supported by the light.
+      example: 120
+      selector:
+        number:
+          min: 0
+          max: 255
+    brightness_pct:
+      name: Brightness percentage
+      description: Number indicating percentage of full brightness when turning lights on, where 0 turns the light off, 1 is the minimum brightness and 100 is the maximum brightness supported by the light.
+      example: 47
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    rgb_color:
+      name: RGB color
+      description: A list containing three integers between 0 and 255 representing the RGB (red, green, blue) color for the light when turning on.
+      example: [255, 100, 100]
+      selector:
+        color_rgb:
+    color_name:
+      name: Color name
+      description: A human readable color name when turning lights on.
+      example: red
+      selector:
+        text:
+    speed:
+      name: Fan Speed
+      description: Speed setting for fans when turning on (low, medium, high, or percentage 0-100).
+      example: "medium"
+      selector:
+        text:
+    speed_pct:
+      name: Fan Speed Percentage
+      description: Fan speed as percentage (0-100) when turning on.
+      example: 75
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    delay:
+      name: Custom Delay Override
+      description: Override base timeout for this call (milliseconds). Use for slower devices.
+      example: 2000
+      selector:
+        number:
+          min: 500
+          max: 10000
+          unit_of_measurement: ms
+    transition:
+      name: Light Transition Timing
+      description: Duration in seconds for smooth fade to next state (0 = instant).
+      selector:
+        number:
+          min: 0
+          max: 300
+          unit_of_measurement: s
+
 turn_off:
   name: Turn off with retry
   description: Reliably turn off devices with retry logic and state verification

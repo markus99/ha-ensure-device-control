@@ -52,15 +52,34 @@ target:
 data:
   brightness_pct: 80
 
-# Toggle devices - turn on if off, turn off if on
+# Toggle devices - each entity flips individually
 action: ensure.toggle
 target:
   entity_id: light.kitchen
 data:
   brightness_pct: 90  # Used when turning ON
+
+# Toggle group - mirrors Home Assistant behavior
+action: ensure.toggle_group
+target:
+  entity_id: group.bedroom_lights
+data:
+  brightness_pct: 75  # All get same action based on group state
 ```
 
 The integration will automatically retry up to 5 times with increasing delays if the device doesn't respond, and notify you if it ultimately fails.
+
+## Toggle Service Comparison
+
+**`ensure.toggle`** - Smart Individual Toggle
+- Each entity flips to its opposite state individually
+- Mixed group example: ON + OFF + ON → OFF + ON + OFF
+- Best for: Getting mixed groups into a consistent state
+
+**`ensure.toggle_group`** - Group-Based Toggle (like Home Assistant)
+- Treats group as single unit: if ANY entity is on, turn ALL off
+- Mixed group example: ON + OFF + ON → ALL OFF
+- Best for: Standard Home Assistant toggle behavior with reliability
 
 ## ✨ New in v0.3.1-beta
 
@@ -82,7 +101,8 @@ The integration will automatically retry up to 5 times with increasing delays if
 
 - `ensure.turn_on` - Reliably turn on devices with full parameter support
 - `ensure.turn_off` - Reliably turn off devices
-- `ensure.toggle` - Reliably toggle devices (turn on if off, turn off if on)
+- `ensure.toggle` - Reliably toggle devices (each entity flips individually)
+- `ensure.toggle_group` - Reliably toggle as group (mirrors HA behavior)
 
 ## Supported Parameters
 
