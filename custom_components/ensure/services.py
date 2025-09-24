@@ -506,6 +506,13 @@ def _check_attribute_tolerances(entity_id: str, state, service_data: Dict[str, A
             # Some lights don't report HS color back - if light is on, assume command worked
             _log(LOGGING_LEVEL_VERBOSE, f"⚠️ {entity_id}: HS color not reported back, assuming command succeeded")
 
+    # Check color name
+    if "color_name" in service_data:
+        target_color_name = service_data["color_name"]
+        # Color names are converted to other formats by HA, so if light is on, assume it worked
+        # We can't reliably validate color names since HA converts them to RGB/HS internally
+        _log(LOGGING_LEVEL_VERBOSE, f"🎨 {entity_id}: Color name '{target_color_name}' requested - assuming command succeeded since light is ON")
+
     return True
 
 def _get_target_entities(hass: HomeAssistant, call: ServiceCall) -> List[str]:
@@ -629,7 +636,7 @@ async def _create_failure_notification(hass: HomeAssistant, entity_id: str, targ
         message = f"⚠️ {message}\n\nBoth immediate and background retries failed. Manual intervention may be required."
 
     notification_id = f"device_fail_{entity_id.replace('.', '_')}"
-    await persistent_notification.async_create(
+    persistent_notification.async_create(
         hass,
         f"{message}\n\n**[Retry Device Now](/api/services/ensure/retry_failed_device?entity_id={entity_id}&target_state={target_state})**",
         title,
