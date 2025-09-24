@@ -279,6 +279,11 @@ async def _process_entities_concurrently(hass: HomeAssistant, entity_ids: List[s
 async def _try_original_target(hass: HomeAssistant, original_target: str, state: str, service_data: Dict[str, Any]) -> None:
     """Try the original target as-is (matching original script logic)."""
 
+    # Validate that the target entity exists
+    if not hass.states.get(original_target):
+        _log(LOGGING_LEVEL_VERBOSE, f"⚠️ Skipping original target {original_target} - entity not found")
+        return
+
     # Determine service to call based on original script logic
     domain = original_target.split(".")[0]
     if domain == "group":
@@ -334,6 +339,11 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
     global _service_config
 
     _log(LOGGING_LEVEL_VERBOSE, f"🔍 Starting core retry logic for {entity_id} -> {target_state}")
+
+    # Validate that the entity exists before trying to control it
+    if not hass.states.get(entity_id):
+        _log(LOGGING_LEVEL_VERBOSE, f"⚠️ Skipping {entity_id} - entity not found in state registry")
+        return
 
     domain = entity_id.split(".")[0]
 
