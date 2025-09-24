@@ -50,17 +50,22 @@ _service_config = {
 
 def _log(level: int, message: str, *args) -> None:
     """Log message based on configured logging level."""
-    current_level = _service_config.get(CONF_LOGGING_LEVEL, DEFAULT_LOGGING_LEVEL)
+    try:
+        # Safely get logging level with fallback
+        current_level = _service_config.get(CONF_LOGGING_LEVEL, DEFAULT_LOGGING_LEVEL)
 
-    if level == LOGGING_LEVEL_MINIMAL:
-        # Always log errors and critical operations
-        _LOGGER.error(message, *args)
-    elif level == LOGGING_LEVEL_NORMAL and current_level >= LOGGING_LEVEL_NORMAL:
-        # Log standard operations
-        _LOGGER.info(message, *args)
-    elif level == LOGGING_LEVEL_VERBOSE and current_level >= LOGGING_LEVEL_VERBOSE:
-        # Log detailed debug information
-        _LOGGER.debug(message, *args)
+        if level == LOGGING_LEVEL_MINIMAL:
+            # Always log errors and critical operations
+            _LOGGER.error(message, *args)
+        elif level == LOGGING_LEVEL_NORMAL and current_level >= LOGGING_LEVEL_NORMAL:
+            # Log standard operations
+            _LOGGER.info(message, *args)
+        elif level == LOGGING_LEVEL_VERBOSE and current_level >= LOGGING_LEVEL_VERBOSE:
+            # Log detailed debug information
+            _LOGGER.debug(message, *args)
+    except Exception as e:
+        # Fallback to standard logging if our custom logging fails
+        _LOGGER.warning(f"Logging function error: {e} - Original message: {message}")
 
 async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = None) -> None:
     """Set up the ensure services."""
@@ -69,7 +74,8 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
     # Update global config if provided
     if config:
         _service_config.update(config)
-        _log(LOGGING_LEVEL_VERBOSE, f"📋 Updated service config: {_service_config}")
+        # Use standard logger during setup to avoid potential recursion issues
+        _LOGGER.debug(f"Updated service config: {_service_config}")
 
     # Only register services once
     if not hass.services.has_service(DOMAIN, SERVICE_TURN_ON):
@@ -104,7 +110,8 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
         hass.services.async_register(DOMAIN, SERVICE_TURN_OFF, ensure_turn_off)
         hass.services.async_register(DOMAIN, "retry_failed_device", retry_failed_device)
 
-        _log(LOGGING_LEVEL_NORMAL, "✅ Ensure services registered successfully")
+        # Use standard logger during setup to prevent issues
+        _LOGGER.info("Ensure services registered successfully")
 
 async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: str) -> None:
     """Handle the ensure service call with retry logic."""
