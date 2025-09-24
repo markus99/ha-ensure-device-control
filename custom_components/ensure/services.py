@@ -16,10 +16,15 @@ from .const import (
     CONF_BASE_TIMEOUT,
     CONF_ENABLE_NOTIFICATIONS,
     CONF_BACKGROUND_RETRY_DELAY,
+    CONF_LOGGING_LEVEL,
     DEFAULT_MAX_RETRIES,
     DEFAULT_BASE_TIMEOUT,
     DEFAULT_ENABLE_NOTIFICATIONS,
     DEFAULT_BACKGROUND_RETRY_DELAY,
+    DEFAULT_LOGGING_LEVEL,
+    LOGGING_LEVEL_MINIMAL,
+    LOGGING_LEVEL_NORMAL,
+    LOGGING_LEVEL_VERBOSE,
     FIXED_TIMEOUT_INCREMENT,
     FIXED_INITIAL_DELAY,
     BACKGROUND_RETRY_DISABLE_THRESHOLD,
@@ -40,7 +45,22 @@ _service_config = {
     CONF_BASE_TIMEOUT: DEFAULT_BASE_TIMEOUT,
     CONF_ENABLE_NOTIFICATIONS: DEFAULT_ENABLE_NOTIFICATIONS,
     CONF_BACKGROUND_RETRY_DELAY: DEFAULT_BACKGROUND_RETRY_DELAY,
+    CONF_LOGGING_LEVEL: DEFAULT_LOGGING_LEVEL,
 }
+
+def _log(level: int, message: str, *args) -> None:
+    """Log message based on configured logging level."""
+    current_level = _service_config.get(CONF_LOGGING_LEVEL, DEFAULT_LOGGING_LEVEL)
+
+    if level == LOGGING_LEVEL_MINIMAL:
+        # Always log errors and critical operations
+        _LOGGER.error(message, *args)
+    elif level == LOGGING_LEVEL_NORMAL and current_level >= LOGGING_LEVEL_NORMAL:
+        # Log standard operations
+        _LOGGER.info(message, *args)
+    elif level == LOGGING_LEVEL_VERBOSE and current_level >= LOGGING_LEVEL_VERBOSE:
+        # Log detailed debug information
+        _LOGGER.debug(message, *args)
 
 async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = None) -> None:
     """Set up the ensure services."""
@@ -49,7 +69,7 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
     # Update global config if provided
     if config:
         _service_config.update(config)
-        _LOGGER.debug(f"Updated service config: {_service_config}")
+        _log(LOGGING_LEVEL_VERBOSE, f"📋 Updated service config: {_service_config}")
 
     # Only register services once
     if not hass.services.has_service(DOMAIN, SERVICE_TURN_ON):
@@ -67,10 +87,10 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
             target_state = call.data.get("target_state")
 
             if not entity_id or not target_state:
-                _LOGGER.error("Missing entity_id or target_state for retry")
+                _log(LOGGING_LEVEL_MINIMAL, "❌ Missing entity_id or target_state for retry")
                 return
 
-            _LOGGER.info(f"Retrying failed device: {entity_id} -> {target_state}")
+            _log(LOGGING_LEVEL_NORMAL, f"🔄 Manual retry for failed device: {entity_id} -> {target_state}")
 
             # Create a new service call to retry the device
             await _ensure_entity_state(hass, entity_id, target_state, {})
@@ -84,7 +104,7 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
         hass.services.async_register(DOMAIN, SERVICE_TURN_OFF, ensure_turn_off)
         hass.services.async_register(DOMAIN, "retry_failed_device", retry_failed_device)
 
-        _LOGGER.info("Ensure services registered successfully")
+        _log(LOGGING_LEVEL_NORMAL, "✅ Ensure services registered successfully")
 
 async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: str) -> None:
     """Handle the ensure service call with retry logic."""
@@ -94,7 +114,8 @@ async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: 
     if not original_target:
         raise ServiceValidationError("No entities specified")
 
-    _LOGGER.debug(f"Ensure {state} called for original target: {original_target}")
+    _log(LOGGING_LEVEL_NORMAL, f"🎯 Ensure {state} called for: {original_target}")
+    _log(LOGGING_LEVEL_VERBOSE, f"Service call data: {call.data}")
 
     # Get service data
     service_data = dict(call.data)
@@ -196,28 +217,36 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
     """Core retry logic with configurable background retry behavior."""
     global _service_config
 
+    _log(LOGGING_LEVEL_VERBOSE, f"🔍 Starting core retry logic for {entity_id} -> {target_state}")
+
     domain = entity_id.split(".")[0]
     retry_count = 0
     max_retries = _service_config[CONF_MAX_RETRIES]
 
+    _log(LOGGING_LEVEL_VERBOSE, f"🎯 {entity_id}: max_retries={max_retries}, domain={domain}")
+
     # Use delay parameter override if provided, otherwise use configured base timeout
     base_timeout = service_data.get("delay", _service_config[CONF_BASE_TIMEOUT])
     if "delay" in service_data:
-        _LOGGER.debug(f"Using custom delay override: {base_timeout}ms for {entity_id}")
+        _log(LOGGING_LEVEL_VERBOSE, f"⏱️ Using custom delay override: {base_timeout}ms for {entity_id}")
 
     while retry_count < max_retries:
         # Check if entity is already in desired state
         if await _is_entity_in_target_state(hass, entity_id, target_state, service_data):
-            _LOGGER.debug(f"{entity_id} reached target state on attempt {retry_count + 1}")
+            _log(LOGGING_LEVEL_NORMAL, f"✅ SUCCESS: {entity_id} reached {target_state} on attempt {retry_count + 1}")
             return
 
         retry_count += 1
+
+        _log(LOGGING_LEVEL_VERBOSE, f"🔄 {entity_id}: Starting attempt {retry_count}/{max_retries}")
 
         # Calculate timeout for this attempt
         timeout_ms = base_timeout + (retry_count * FIXED_TIMEOUT_INCREMENT)
         timeout_sec = timeout_ms / 1000
 
-        _LOGGER.debug(f"Retry {retry_count}/{max_retries} for {entity_id}, timeout: {timeout_sec}s")
+        _log(LOGGING_LEVEL_VERBOSE, f"⏱️ {entity_id}: timeout={timeout_ms}ms for attempt {retry_count}")
+
+        # Remove duplicate debug log (already logged above)
 
         # Call the service
         data = {"entity_id": entity_id}
@@ -227,13 +256,12 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
             data.update(filtered_data)
 
         try:
-            await hass.services.async_call(
-                domain,
-                f"turn_{target_state}",
-                data
-            )
+            service_name = f"turn_{target_state}"
+            _log(LOGGING_LEVEL_VERBOSE, f"📡 Calling {domain}.{service_name} for {entity_id} with: {data}")
+            await hass.services.async_call(domain, service_name, data)
+            _log(LOGGING_LEVEL_VERBOSE, f"✅ Service call completed for {entity_id}")
         except Exception as e:
-            _LOGGER.warning(f"Service call failed for {entity_id} on attempt {retry_count}: {e}")
+            _log(LOGGING_LEVEL_MINIMAL, f"❌ Service call failed for {entity_id} on attempt {retry_count}: {e}")
 
         # Wait for state change with timeout
         try:
@@ -242,14 +270,14 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
                 timeout=timeout_sec
             )
         except asyncio.TimeoutError:
-            _LOGGER.debug(f"Timeout waiting for {entity_id} state change on attempt {retry_count}")
+            _log(LOGGING_LEVEL_VERBOSE, f"⏰ Timeout waiting for {entity_id} state change on attempt {retry_count}")
             continue
 
     # If we get here, all retries failed
     current_state = hass.states.get(entity_id)
     current_state_value = current_state.state if current_state else "unknown"
 
-    _LOGGER.error(f"{entity_id} failed to ensure device is {target_state.upper()} after {max_retries} attempts. Current state: {current_state_value}")
+    _log(LOGGING_LEVEL_MINIMAL, f"⚠️ FINAL FAILURE: {entity_id} -> {target_state.upper()} after {max_retries} attempts. Current: {current_state_value}")
 
     # Handle notification and background retry logic (only if allowed)
     if allow_background_retry and _service_config[CONF_ENABLE_NOTIFICATIONS]:
@@ -257,11 +285,11 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
 
         # If background retry is disabled (threshold+), notify immediately
         if background_delay >= BACKGROUND_RETRY_DISABLE_THRESHOLD:
-            _LOGGER.info(f"Background retry disabled (delay={background_delay}s), notifying immediately")
+            _log(LOGGING_LEVEL_NORMAL, f"❌ Background retry disabled (delay={background_delay}s), notifying immediately")
             await _create_failure_notification(hass, entity_id, target_state, max_retries, current_state_value, original_target, immediate=True)
         else:
             # Schedule background retry - notification only happens if that fails too
-            _LOGGER.info(f"Scheduling background retry for {entity_id} in {background_delay} seconds (no immediate notification)")
+            _log(LOGGING_LEVEL_NORMAL, f"🔄 Scheduling background retry for {entity_id} in {background_delay}s (silent)")
             hass.async_create_task(
                 _background_retry(hass, entity_id, target_state, service_data, original_target, background_delay, max_retries)
             )
@@ -282,19 +310,24 @@ async def _is_entity_in_target_state(hass: HomeAssistant, entity_id: str, target
 
     state = hass.states.get(entity_id)
     if not state:
+        _log(LOGGING_LEVEL_VERBOSE, f"❌ {entity_id}: No state object found")
         return False
 
     # Check basic on/off state
     if state.state != target_state:
+        _log(LOGGING_LEVEL_VERBOSE, f"❌ {entity_id}: State mismatch - current: {state.state}, target: {target_state}")
         return False
 
     # For "off" state, basic state check is sufficient
     if target_state == "off":
+        _log(LOGGING_LEVEL_VERBOSE, f"✅ {entity_id}: OFF state confirmed")
         return True
 
     # For "on" state, check additional attributes if specified
     if target_state == "on" and service_data:
-        return _check_attribute_tolerances(state, service_data)
+        result = _check_attribute_tolerances(state, service_data)
+        _log(LOGGING_LEVEL_VERBOSE, f"✅ {entity_id}: ON state + attributes check = {result}")
+        return result
 
     return True
 
@@ -464,20 +497,20 @@ async def _background_retry(hass: HomeAssistant, entity_id: str, target_state: s
 
     # Check if device is already in correct state
     if await _is_entity_in_target_state(hass, entity_id, target_state, service_data):
-        _LOGGER.info(f"Background retry: {entity_id} already in correct state, skipping retry")
+        _log(LOGGING_LEVEL_NORMAL, f"✅ Background retry: {entity_id} already in correct state, skipping")
         return
 
-    _LOGGER.info(f"Background retry: Starting retry attempt for {entity_id} -> {target_state}")
+    _log(LOGGING_LEVEL_NORMAL, f"🔄 Background retry: Starting for {entity_id} -> {target_state}")
 
     try:
         # Attempt the retry with full retry logic, but avoid infinite background retries
         await _ensure_entity_state_core(hass, entity_id, target_state, service_data, original_target, allow_background_retry=False)
 
         # If successful, just log it (no notification for success)
-        _LOGGER.info(f"Background retry successful: {entity_id} is now {target_state.upper()}")
+        _log(LOGGING_LEVEL_NORMAL, f"✨ Background retry SUCCESS: {entity_id} -> {target_state.upper()}")
 
     except Exception as e:
-        _LOGGER.error(f"Background retry failed for {entity_id}: {e}")
+        _log(LOGGING_LEVEL_MINIMAL, f"❌ Background retry FAILED for {entity_id}: {e}")
 
         # Now create the failure notification since both immediate and background failed
         current_state = hass.states.get(entity_id)

@@ -11,12 +11,25 @@ CONF_MAX_RETRIES = "max_retries"
 CONF_BASE_TIMEOUT = "base_timeout"
 CONF_ENABLE_NOTIFICATIONS = "enable_notifications"
 CONF_BACKGROUND_RETRY_DELAY = "background_retry_delay"
+CONF_LOGGING_LEVEL = "logging_level"
 
 # Default configuration values
 DEFAULT_MAX_RETRIES = 5
 DEFAULT_BASE_TIMEOUT = 1000  # milliseconds
 DEFAULT_ENABLE_NOTIFICATIONS = True
 DEFAULT_BACKGROUND_RETRY_DELAY = 30  # seconds
+DEFAULT_LOGGING_LEVEL = 2  # Normal logging
+
+# Logging levels (user configurable)
+LOGGING_LEVEL_MINIMAL = 1  # Minimal: Only errors and critical operations
+LOGGING_LEVEL_NORMAL = 2   # Normal: Standard operational logging
+LOGGING_LEVEL_VERBOSE = 3  # Verbose: Full debugging information
+
+LOGGING_LEVEL_OPTIONS = {
+    LOGGING_LEVEL_MINIMAL: "Minimal (Errors Only)",
+    LOGGING_LEVEL_NORMAL: "Normal (Standard)",
+    LOGGING_LEVEL_VERBOSE: "Verbose (Full Debug)",
+}
 
 # Fixed retry settings (not configurable)
 FIXED_TIMEOUT_INCREMENT = 500  # milliseconds

@@ -14,10 +14,13 @@ from .const import (
     CONF_BASE_TIMEOUT,
     CONF_ENABLE_NOTIFICATIONS,
     CONF_BACKGROUND_RETRY_DELAY,
+    CONF_LOGGING_LEVEL,
     DEFAULT_MAX_RETRIES,
     DEFAULT_BASE_TIMEOUT,
     DEFAULT_ENABLE_NOTIFICATIONS,
     DEFAULT_BACKGROUND_RETRY_DELAY,
+    DEFAULT_LOGGING_LEVEL,
+    LOGGING_LEVEL_OPTIONS,
 )
 
 
@@ -61,6 +64,7 @@ class EnsureConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Optional(CONF_BACKGROUND_RETRY_DELAY, default=DEFAULT_BACKGROUND_RETRY_DELAY): vol.All(
                 int, vol.Range(min=10, max=300)
             ),
+            vol.Optional(CONF_LOGGING_LEVEL, default=DEFAULT_LOGGING_LEVEL): vol.In(list(LOGGING_LEVEL_OPTIONS.keys())),
         })
 
         return self.async_show_form(
@@ -127,6 +131,10 @@ class EnsureOptionsFlowHandler(config_entries.OptionsFlow):
                 CONF_BACKGROUND_RETRY_DELAY,
                 default=current_options.get(CONF_BACKGROUND_RETRY_DELAY, DEFAULT_BACKGROUND_RETRY_DELAY)
             ): vol.All(int, vol.Range(min=10, max=300)),
+            vol.Optional(
+                CONF_LOGGING_LEVEL,
+                default=current_options.get(CONF_LOGGING_LEVEL, DEFAULT_LOGGING_LEVEL)
+            ): vol.In(list(LOGGING_LEVEL_OPTIONS.keys())),
         })
 
         return self.async_show_form(

@@ -158,6 +158,10 @@ Configure:
 - Base timeout (500-5000ms, default: 1000ms)
 - Failure notifications (on/off, default: on)
 - Background retry delay (10-300 seconds, default: 30s)
+- Debug logging level (1-3, default: 2)
+  - **1 (Minimal)**: Only errors and critical failures
+  - **2 (Normal)**: Standard operational logging
+  - **3 (Verbose)**: Full debug information with detailed state tracking
 
 ## Testing & Feedback
 

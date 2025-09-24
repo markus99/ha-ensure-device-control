@@ -8,7 +8,8 @@
           "max_retries": "Maximum retry attempts (1-10)",
           "base_timeout": "Base timeout in milliseconds (500-5000)",
           "enable_notifications": "Enable failure notifications",
-          "background_retry_delay": "Background retry delay in seconds (10-300)"
+          "background_retry_delay": "Background retry delay in seconds (10-300)",
+          "logging_level": "Debug logging level"
         }
       }
     },
@@ -27,7 +28,8 @@
           "max_retries": "Maximum retry attempts (1-10)",
           "base_timeout": "Base timeout in milliseconds (500-5000)",
           "enable_notifications": "Enable failure notifications",
-          "background_retry_delay": "Background retry delay in seconds (10-300)"
+          "background_retry_delay": "Background retry delay in seconds (10-300)",
+          "logging_level": "Debug logging level"
         }
       }
     },
