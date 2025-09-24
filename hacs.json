@@ -7,6 +7,6 @@
   "render_readme": true,
   "domains": ["ensure"],
   "iot_class": "Local Polling",
-  "version": "0.5.2-beta",
+  "version": "0.5.3-beta",
   "icon": "icon.png"
 }

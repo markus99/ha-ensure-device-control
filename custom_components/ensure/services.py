@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.template import expand
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.components import persistent_notification
 
@@ -540,7 +541,30 @@ def _get_target_entities(hass: HomeAssistant, call: ServiceCall) -> List[str]:
             seen.add(entity_id)
             unique_entity_ids.append(entity_id)
 
-    return unique_entity_ids
+    # Expand groups to individual entities to prevent group.turn_on calls in retry loop
+    expanded_entities = []
+    for entity_id in unique_entity_ids:
+        if entity_id.startswith("group."):
+            # Use Home Assistant's expand function to get individual entities
+            group_state = hass.states.get(entity_id)
+            if group_state:
+                expanded = expand(hass, [group_state])
+                expanded_entities.extend([entity.entity_id for entity in expanded])
+            else:
+                # If group doesn't exist, still include it (will fail gracefully later)
+                expanded_entities.append(entity_id)
+        else:
+            expanded_entities.append(entity_id)
+
+    # Remove duplicates again after expansion
+    seen = set()
+    final_entity_ids = []
+    for entity_id in expanded_entities:
+        if entity_id not in seen:
+            seen.add(entity_id)
+            final_entity_ids.append(entity_id)
+
+    return final_entity_ids
 
 def _resolve_parameter_conflicts(hass: HomeAssistant, service_data: Dict[str, Any], entity_ids: List[str], state: str) -> Dict[str, Any]:
     """Resolve parameter conflicts using priority order."""
