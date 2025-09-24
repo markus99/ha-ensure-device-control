@@ -276,13 +276,12 @@ async def _try_original_target(hass: HomeAssistant, original_target: str, state:
     """Try the original target as-is (matching original script logic)."""
 
     # Determine service to call based on original script logic
-    if 'group' in original_target:
+    domain = original_target.split(".")[0]
+    if domain == "group":
         service_domain = "homeassistant"
-        service_name = f"turn_{state}"
     else:
-        domain = original_target.split(".")[0]
         service_domain = domain
-        service_name = f"turn_{state}"
+    service_name = f"turn_{state}"
 
     # Prepare service data
     data = {"entity_id": original_target}
@@ -332,6 +331,13 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
     _log(LOGGING_LEVEL_VERBOSE, f"🔍 Starting core retry logic for {entity_id} -> {target_state}")
 
     domain = entity_id.split(".")[0]
+
+    # Use homeassistant domain for groups since group.turn_on doesn't exist
+    if domain == "group":
+        service_domain = "homeassistant"
+    else:
+        service_domain = domain
+
     retry_count = 0
     max_retries = _service_config[CONF_MAX_RETRIES]
 
@@ -369,8 +375,8 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
 
         try:
             service_name = f"turn_{target_state}"
-            _log(LOGGING_LEVEL_VERBOSE, f"📡 Calling {domain}.{service_name} for {entity_id} with: {data}")
-            await hass.services.async_call(domain, service_name, data)
+            _log(LOGGING_LEVEL_VERBOSE, f"📡 Calling {service_domain}.{service_name} for {entity_id} with: {data}")
+            await hass.services.async_call(service_domain, service_name, data)
             _log(LOGGING_LEVEL_VERBOSE, f"✅ Service call completed for {entity_id}")
         except Exception as e:
             _log(LOGGING_LEVEL_MINIMAL, f"❌ Service call failed for {entity_id} on attempt {retry_count}: {e}")
