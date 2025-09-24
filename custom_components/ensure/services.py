@@ -442,13 +442,13 @@ async def _is_entity_in_target_state(hass: HomeAssistant, entity_id: str, target
 
     # For "on" state, check additional attributes if specified
     if target_state == "on" and service_data:
-        result = _check_attribute_tolerances(state, service_data)
+        result = _check_attribute_tolerances(entity_id, state, service_data)
         _log(LOGGING_LEVEL_VERBOSE, f"✅ {entity_id}: ON state + attributes check = {result}")
         return result
 
     return True
 
-def _check_attribute_tolerances(state, service_data: Dict[str, Any]) -> bool:
+def _check_attribute_tolerances(entity_id: str, state, service_data: Dict[str, Any]) -> bool:
     """Check if entity attributes match target values within tolerance."""
 
     attributes = state.attributes
@@ -476,7 +476,8 @@ def _check_attribute_tolerances(state, service_data: Dict[str, Any]) -> bool:
                 if abs(actual_rgb[i] - target_rgb[i]) > RGB_TOLERANCE:
                     return False
         elif not actual_rgb:
-            return False
+            # Many lights don't report RGB back accurately - if light is on, assume RGB worked
+            _log(LOGGING_LEVEL_VERBOSE, f"⚠️ {entity_id}: RGB not reported back, assuming command succeeded")
 
     # Check color temperature (Kelvin)
     if "color_temp_kelvin" in service_data or "kelvin" in service_data:
@@ -485,7 +486,8 @@ def _check_attribute_tolerances(state, service_data: Dict[str, Any]) -> bool:
         if actual_kelvin and abs(actual_kelvin - target_kelvin) > KELVIN_TOLERANCE:
             return False
         elif not actual_kelvin:
-            return False
+            # Some lights don't report color temp back - if light is on, assume command worked
+            _log(LOGGING_LEVEL_VERBOSE, f"⚠️ {entity_id}: Color temperature not reported back, assuming command succeeded")
 
     # Check hue and saturation
     if "hs_color" in service_data:
@@ -497,7 +499,8 @@ def _check_attribute_tolerances(state, service_data: Dict[str, Any]) -> bool:
             if abs(actual_hs[1] - target_hs[1]) > SATURATION_TOLERANCE:
                 return False
         elif not actual_hs:
-            return False
+            # Some lights don't report HS color back - if light is on, assume command worked
+            _log(LOGGING_LEVEL_VERBOSE, f"⚠️ {entity_id}: HS color not reported back, assuming command succeeded")
 
     return True
 
