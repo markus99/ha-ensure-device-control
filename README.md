@@ -144,6 +144,11 @@ data:
 2. Install "Ensure Device Control (BETA)"
 3. Restart Home Assistant
 
+**Note**: If the integration icon doesn't appear in HACS, try:
+- Refresh your browser cache (Ctrl+F5)
+- Wait a few minutes for HACS to sync the icon
+- Check HACS > Settings > Clear cache
+
 ### Manual Installation
 1. Copy `custom_components/ensure/` to your HA installation
 2. Restart Home Assistant
