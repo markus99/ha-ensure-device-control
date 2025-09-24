@@ -146,7 +146,9 @@ async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: 
     expanded_entities = _get_target_entities(hass, call)
 
     # Resolve parameter conflicts with priority order and add smart defaults
+    _log(LOGGING_LEVEL_VERBOSE, f"🔧 Before conflict resolution: {list(service_data.keys())}")
     service_data = _resolve_parameter_conflicts(hass, service_data, expanded_entities, state)
+    _log(LOGGING_LEVEL_VERBOSE, f"🔧 After conflict resolution: {list(service_data.keys())}")
 
     # Try original target first (preserves group operations for speed)
     await _try_original_target(hass, original_target, state, service_data)
@@ -291,6 +293,7 @@ async def _try_original_target(hass: HomeAssistant, original_target: str, state:
         # Filter out ensure-specific parameters that shouldn't go to the device
         filtered_data = {k: v for k, v in service_data.items() if k != "delay"}
         data.update(filtered_data)
+        _log(LOGGING_LEVEL_VERBOSE, f"📡 Original target service data: {filtered_data}")
 
     try:
         await hass.services.async_call(service_domain, service_name, data)
