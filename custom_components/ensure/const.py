@@ -204,7 +204,6 @@ SUPPORTED_FEATURES = [
     "rgb_color",
     "color_name",
     "color_temp_kelvin",
-    "kelvin",
     "hue",
     "saturation",
     "xy_color",

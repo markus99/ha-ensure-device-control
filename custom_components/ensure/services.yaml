@@ -192,12 +192,6 @@ turn_on:
       selector:
         color_temp:
           unit: kelvin
-    kelvin:
-      name: Kelvin
-      description: Color temperature in Kelvin (alias for color_temp_kelvin).
-      selector:
-        color_temp:
-          unit: kelvin
     xy_color:
       name: XY-color
       description: Color in XY-format.
