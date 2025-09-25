@@ -43,7 +43,9 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# Global config storage for services
+# Global config storage for services (with thread-safe access)
+import threading
+_service_config_lock = threading.Lock()
 _service_config = {
     CONF_MAX_RETRIES: DEFAULT_MAX_RETRIES,
     CONF_BASE_TIMEOUT: DEFAULT_BASE_TIMEOUT,
@@ -52,11 +54,16 @@ _service_config = {
     CONF_LOGGING_LEVEL: DEFAULT_LOGGING_LEVEL,
 }
 
+def _get_service_config() -> Dict[str, Any]:
+    """Get service configuration safely with thread lock."""
+    with _service_config_lock:
+        return dict(_service_config)  # Return a copy to avoid race conditions
+
 def _log(level: int, message: str, *args) -> None:
     """Log message based on configured logging level."""
     try:
         # Safely get logging level with fallback
-        current_level = _service_config.get(CONF_LOGGING_LEVEL, DEFAULT_LOGGING_LEVEL)
+        current_level = _get_service_config().get(CONF_LOGGING_LEVEL, DEFAULT_LOGGING_LEVEL)
 
         if level == LOGGING_LEVEL_MINIMAL:
             # Always log errors and critical operations
@@ -75,11 +82,12 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
     """Set up the ensure services."""
     global _service_config
 
-    # Update global config if provided
+    # Update global config safely with thread lock
     if config:
-        _service_config.update(config)
+        with _service_config_lock:
+            _service_config.update(config)
         # Use standard logger during setup to avoid potential recursion issues
-        _LOGGER.debug(f"Updated service config: {_service_config}")
+        _LOGGER.debug(f"Updated service config: {dict(_service_config)}")
 
     # Only register services once
     if not hass.services.has_service(DOMAIN, SERVICE_TURN_ON):
@@ -336,7 +344,7 @@ async def _ensure_entity_state(hass: HomeAssistant, entity_id: str, target_state
 
 async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any], original_target: str = None, allow_background_retry: bool = True) -> None:
     """Core retry logic with configurable background retry behavior."""
-    global _service_config
+    config = _get_service_config()
 
     _log(LOGGING_LEVEL_VERBOSE, f"🔍 Starting core retry logic for {entity_id} -> {target_state}")
 
@@ -352,12 +360,12 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
     service_domain = domain
 
     retry_count = 0
-    max_retries = _service_config[CONF_MAX_RETRIES]
+    max_retries = config[CONF_MAX_RETRIES]
 
     _log(LOGGING_LEVEL_VERBOSE, f"🎯 {entity_id}: max_retries={max_retries}, domain={domain}")
 
     # Use delay parameter override if provided, otherwise use configured base timeout
-    base_timeout = service_data.get("delay", _service_config[CONF_BASE_TIMEOUT])
+    base_timeout = service_data.get("delay", config[CONF_BASE_TIMEOUT])
     if "delay" in service_data:
         _log(LOGGING_LEVEL_VERBOSE, f"⏱️ Using custom delay override: {base_timeout}ms for {entity_id}")
 
@@ -411,8 +419,8 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
     _log(LOGGING_LEVEL_MINIMAL, f"⚠️ FINAL FAILURE: {entity_id} -> {target_state.upper()} after {max_retries} attempts. Current: {current_state_value}")
 
     # Handle notification and background retry logic (only if allowed)
-    if allow_background_retry and _service_config[CONF_ENABLE_NOTIFICATIONS]:
-        background_delay = _service_config[CONF_BACKGROUND_RETRY_DELAY]
+    if allow_background_retry and config[CONF_ENABLE_NOTIFICATIONS]:
+        background_delay = config[CONF_BACKGROUND_RETRY_DELAY]
 
         # If background retry is disabled (threshold+), notify immediately
         if background_delay >= BACKGROUND_RETRY_DISABLE_THRESHOLD:
@@ -695,6 +703,7 @@ async def _background_retry(hass: HomeAssistant, entity_id: str, target_state: s
         current_state = hass.states.get(entity_id)
         current_state_value = current_state.state if current_state else "unknown"
 
-        if _service_config[CONF_ENABLE_NOTIFICATIONS]:
+        config = _get_service_config()
+        if config[CONF_ENABLE_NOTIFICATIONS]:
             await _create_failure_notification(hass, entity_id, target_state, original_max_retries, current_state_value, original_target, immediate=False)
 
