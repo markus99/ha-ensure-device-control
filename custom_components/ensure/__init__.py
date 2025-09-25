@@ -68,6 +68,24 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload config entry."""
-    await async_unload_entry(hass, entry)
-    await async_setup_entry(hass, entry)
+    """Reload config entry without disrupting active services."""
+    _LOGGER.info("Reloading Ensure Device Control configuration")
+
+    # Update config data without removing services
+    options = entry.options
+    config_data = {
+        CONF_MAX_RETRIES: options.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES),
+        CONF_BASE_TIMEOUT: options.get(CONF_BASE_TIMEOUT, DEFAULT_BASE_TIMEOUT),
+        CONF_ENABLE_NOTIFICATIONS: options.get(CONF_ENABLE_NOTIFICATIONS, DEFAULT_ENABLE_NOTIFICATIONS),
+        CONF_BACKGROUND_RETRY_DELAY: options.get(CONF_BACKGROUND_RETRY_DELAY, DEFAULT_BACKGROUND_RETRY_DELAY),
+        CONF_LOGGING_LEVEL: options.get(CONF_LOGGING_LEVEL, DEFAULT_LOGGING_LEVEL),
+    }
+
+    # Update stored config
+    hass.data[DOMAIN][entry.entry_id] = config_data
+
+    # Update service config without removing/re-registering services
+    from .services import async_setup_services
+    await async_setup_services(hass, config_data)
+
+    _LOGGER.info("Ensure Device Control configuration reload complete")
