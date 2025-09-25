@@ -71,21 +71,33 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload config entry without disrupting active services."""
     _LOGGER.info("Reloading Ensure Device Control configuration")
 
-    # Update config data without removing services
-    options = entry.options
-    config_data = {
-        CONF_MAX_RETRIES: options.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES),
-        CONF_BASE_TIMEOUT: options.get(CONF_BASE_TIMEOUT, DEFAULT_BASE_TIMEOUT),
-        CONF_ENABLE_NOTIFICATIONS: options.get(CONF_ENABLE_NOTIFICATIONS, DEFAULT_ENABLE_NOTIFICATIONS),
-        CONF_BACKGROUND_RETRY_DELAY: options.get(CONF_BACKGROUND_RETRY_DELAY, DEFAULT_BACKGROUND_RETRY_DELAY),
-        CONF_LOGGING_LEVEL: options.get(CONF_LOGGING_LEVEL, DEFAULT_LOGGING_LEVEL),
-    }
+    try:
+        # Update config data without removing services
+        options = entry.options
+        config_data = {
+            CONF_MAX_RETRIES: options.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES),
+            CONF_BASE_TIMEOUT: options.get(CONF_BASE_TIMEOUT, DEFAULT_BASE_TIMEOUT),
+            CONF_ENABLE_NOTIFICATIONS: options.get(CONF_ENABLE_NOTIFICATIONS, DEFAULT_ENABLE_NOTIFICATIONS),
+            CONF_BACKGROUND_RETRY_DELAY: options.get(CONF_BACKGROUND_RETRY_DELAY, DEFAULT_BACKGROUND_RETRY_DELAY),
+            CONF_LOGGING_LEVEL: options.get(CONF_LOGGING_LEVEL, DEFAULT_LOGGING_LEVEL),
+        }
 
-    # Update stored config
-    hass.data[DOMAIN][entry.entry_id] = config_data
+        # Validate config data
+        if not isinstance(config_data[CONF_MAX_RETRIES], int) or config_data[CONF_MAX_RETRIES] < 1:
+            raise ValueError(f"Invalid max_retries: {config_data[CONF_MAX_RETRIES]}")
+        if not isinstance(config_data[CONF_BASE_TIMEOUT], int) or config_data[CONF_BASE_TIMEOUT] < 500:
+            raise ValueError(f"Invalid base_timeout: {config_data[CONF_BASE_TIMEOUT]}")
 
-    # Update service config without removing/re-registering services
-    from .services import async_setup_services
-    await async_setup_services(hass, config_data)
+        # Update stored config
+        hass.data[DOMAIN][entry.entry_id] = config_data
 
-    _LOGGER.info("Ensure Device Control configuration reload complete")
+        # Update service config without removing/re-registering services
+        from .services import async_setup_services
+        await async_setup_services(hass, config_data)
+
+        _LOGGER.info("Ensure Device Control configuration reload complete")
+
+    except Exception as e:
+        _LOGGER.error(f"Config reload failed: {e}")
+        # Don't re-raise - just log the error to avoid crashing HA
+        # Services will continue to work with previous config
