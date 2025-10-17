@@ -11,6 +11,7 @@ SERVICE_TOGGLE_GROUP = "toggle_group"
 # Configuration options (user configurable)
 CONF_MAX_RETRIES = "max_retries"
 CONF_BASE_TIMEOUT = "base_timeout"
+CONF_GROUP_STAGGER_DELAY = "group_stagger_delay"
 CONF_ENABLE_NOTIFICATIONS = "enable_notifications"
 CONF_BACKGROUND_RETRY_DELAY = "background_retry_delay"
 CONF_LOGGING_LEVEL = "logging_level"
@@ -18,6 +19,7 @@ CONF_LOGGING_LEVEL = "logging_level"
 # Default configuration values
 DEFAULT_MAX_RETRIES = 5
 DEFAULT_BASE_TIMEOUT = 1000  # milliseconds
+DEFAULT_GROUP_STAGGER_DELAY = 100  # milliseconds
 DEFAULT_ENABLE_NOTIFICATIONS = True
 DEFAULT_BACKGROUND_RETRY_DELAY = 30  # seconds
 DEFAULT_LOGGING_LEVEL = 2  # Normal logging

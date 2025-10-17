@@ -12,11 +12,13 @@ from .const import (
     DOMAIN,
     CONF_MAX_RETRIES,
     CONF_BASE_TIMEOUT,
+    CONF_GROUP_STAGGER_DELAY,
     CONF_ENABLE_NOTIFICATIONS,
     CONF_BACKGROUND_RETRY_DELAY,
     CONF_LOGGING_LEVEL,
     DEFAULT_MAX_RETRIES,
     DEFAULT_BASE_TIMEOUT,
+    DEFAULT_GROUP_STAGGER_DELAY,
     DEFAULT_ENABLE_NOTIFICATIONS,
     DEFAULT_BACKGROUND_RETRY_DELAY,
     DEFAULT_LOGGING_LEVEL,
@@ -59,6 +61,9 @@ class EnsureConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             vol.Optional(CONF_BASE_TIMEOUT, default=DEFAULT_BASE_TIMEOUT): vol.All(
                 int, vol.Range(min=500, max=5000)
+            ),
+            vol.Optional(CONF_GROUP_STAGGER_DELAY, default=DEFAULT_GROUP_STAGGER_DELAY): vol.All(
+                int, vol.Range(min=0, max=1000)
             ),
             vol.Optional(CONF_ENABLE_NOTIFICATIONS, default=DEFAULT_ENABLE_NOTIFICATIONS): bool,
             vol.Optional(CONF_BACKGROUND_RETRY_DELAY, default=DEFAULT_BACKGROUND_RETRY_DELAY): vol.All(
@@ -123,6 +128,10 @@ class EnsureOptionsFlowHandler(config_entries.OptionsFlow):
                 CONF_BASE_TIMEOUT,
                 default=current_options.get(CONF_BASE_TIMEOUT, DEFAULT_BASE_TIMEOUT)
             ): vol.All(int, vol.Range(min=500, max=5000)),
+            vol.Optional(
+                CONF_GROUP_STAGGER_DELAY,
+                default=current_options.get(CONF_GROUP_STAGGER_DELAY, DEFAULT_GROUP_STAGGER_DELAY)
+            ): vol.All(int, vol.Range(min=0, max=1000)),
             vol.Optional(
                 CONF_ENABLE_NOTIFICATIONS,
                 default=current_options.get(CONF_ENABLE_NOTIFICATIONS, DEFAULT_ENABLE_NOTIFICATIONS)

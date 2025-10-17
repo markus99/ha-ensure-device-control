@@ -1,6 +1,7 @@
 """Service implementations for Ensure Device Control."""
 import asyncio
 import logging
+import time
 from typing import Any, Dict, List
 
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -17,11 +18,13 @@ from .const import (
     SERVICE_TOGGLE_GROUP,
     CONF_MAX_RETRIES,
     CONF_BASE_TIMEOUT,
+    CONF_GROUP_STAGGER_DELAY,
     CONF_ENABLE_NOTIFICATIONS,
     CONF_BACKGROUND_RETRY_DELAY,
     CONF_LOGGING_LEVEL,
     DEFAULT_MAX_RETRIES,
     DEFAULT_BASE_TIMEOUT,
+    DEFAULT_GROUP_STAGGER_DELAY,
     DEFAULT_ENABLE_NOTIFICATIONS,
     DEFAULT_BACKGROUND_RETRY_DELAY,
     DEFAULT_LOGGING_LEVEL,
@@ -49,10 +52,14 @@ _service_config_lock = threading.Lock()
 _service_config = {
     CONF_MAX_RETRIES: DEFAULT_MAX_RETRIES,
     CONF_BASE_TIMEOUT: DEFAULT_BASE_TIMEOUT,
+    CONF_GROUP_STAGGER_DELAY: DEFAULT_GROUP_STAGGER_DELAY,
     CONF_ENABLE_NOTIFICATIONS: DEFAULT_ENABLE_NOTIFICATIONS,
     CONF_BACKGROUND_RETRY_DELAY: DEFAULT_BACKGROUND_RETRY_DELAY,
     CONF_LOGGING_LEVEL: DEFAULT_LOGGING_LEVEL,
 }
+
+# Global lock for queued ensure service execution (like mode: queued in scripts)
+_ensure_service_lock = asyncio.Lock()
 
 def _get_service_config() -> Dict[str, Any]:
     """Get service configuration safely with thread lock."""
@@ -92,20 +99,24 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
     # Only register services once
     if not hass.services.has_service(DOMAIN, SERVICE_TURN_ON):
         async def ensure_turn_on(call: ServiceCall) -> None:
-            """Handle ensure turn_on service."""
-            await _handle_ensure_service(hass, call, "on")
+            """Handle ensure turn_on service with queued execution."""
+            async with _ensure_service_lock:
+                await _handle_ensure_service(hass, call, "on")
 
         async def ensure_turn_off(call: ServiceCall) -> None:
-            """Handle ensure turn_off service."""
-            await _handle_ensure_service(hass, call, "off")
+            """Handle ensure turn_off service with queued execution."""
+            async with _ensure_service_lock:
+                await _handle_ensure_service(hass, call, "off")
 
         async def ensure_toggle(call: ServiceCall) -> None:
-            """Handle ensure toggle service."""
-            await _handle_ensure_toggle_service(hass, call)
+            """Handle ensure toggle service with queued execution."""
+            async with _ensure_service_lock:
+                await _handle_ensure_toggle_service(hass, call)
 
         async def ensure_toggle_group(call: ServiceCall) -> None:
-            """Handle ensure toggle_group service."""
-            await _handle_ensure_toggle_group_service(hass, call)
+            """Handle ensure toggle_group service with queued execution."""
+            async with _ensure_service_lock:
+                await _handle_ensure_toggle_group_service(hass, call)
 
         async def retry_failed_device(call: ServiceCall) -> None:
             """Retry a previously failed device."""
@@ -135,10 +146,28 @@ async def async_setup_services(hass: HomeAssistant, config: Dict[str, Any] = Non
         # Use standard logger during setup to prevent issues
         _LOGGER.info("Ensure services registered successfully")
 
-async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: str) -> None:
-    """Handle the ensure service call with retry logic."""
+async def _send_single_command(hass: HomeAssistant, entity_id: str, state: str, service_data: Dict[str, Any]) -> None:
+    """Send a single command without retry logic (for first pass)."""
+    domain = entity_id.split(".")[0]
+    service_name = f"turn_{state}"
 
-    # Get original input for first attempt (preserves groups)
+    data = {"entity_id": entity_id}
+    if service_data:
+        # Filter out ensure-specific parameters
+        filtered_data = {k: v for k, v in service_data.items() if k != "delay"}
+        data.update(filtered_data)
+
+    try:
+        await hass.services.async_call(domain, service_name, data)
+        _log(LOGGING_LEVEL_VERBOSE, f"📡 First pass: Sent {service_name} to {entity_id}")
+    except Exception as e:
+        _log(LOGGING_LEVEL_VERBOSE, f"⚠️ First pass command failed for {entity_id}: {e}")
+
+async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: str) -> None:
+    """Handle the ensure service call with two-pass retry logic."""
+    config = _get_service_config()
+
+    # Get original input
     original_target = _get_original_target(call)
     if not original_target:
         raise ServiceValidationError("No entities specified")
@@ -146,36 +175,93 @@ async def _handle_ensure_service(hass: HomeAssistant, call: ServiceCall, state: 
     _log(LOGGING_LEVEL_NORMAL, f"🎯 Ensure {state} called for: {original_target}")
     _log(LOGGING_LEVEL_VERBOSE, f"Service call data: {call.data}")
 
-    # Get service data
+    # Get service data and expand entities
     service_data = dict(call.data)
-    service_data.pop("entity_id", None)  # Remove if present
+    service_data.pop("entity_id", None)
 
-    # Expand to individual entities for conflict resolution context
     expanded_entities = _get_target_entities(hass, call)
-
-    # Resolve parameter conflicts with priority order and add smart defaults
-    _log(LOGGING_LEVEL_VERBOSE, f"🔧 Before conflict resolution: {list(service_data.keys())}")
-    service_data = _resolve_parameter_conflicts(hass, service_data, expanded_entities, state)
-    _log(LOGGING_LEVEL_VERBOSE, f"🔧 After conflict resolution: {list(service_data.keys())}")
-
-    # Try original target first (preserves group operations for speed)
-    await _try_original_target(hass, original_target, state, service_data)
-
-    # Wait a moment for the command to propagate
-    await asyncio.sleep(FIXED_INITIAL_DELAY)
     if not expanded_entities:
         _LOGGER.warning("No entities found after expansion")
         return
 
-    _LOGGER.debug(f"Expanded to individual entities: {expanded_entities}")
+    # Resolve parameter conflicts
+    _log(LOGGING_LEVEL_VERBOSE, f"🔧 Before conflict resolution: {list(service_data.keys())}")
+    service_data = _resolve_parameter_conflicts(hass, service_data, expanded_entities, state)
+    _log(LOGGING_LEVEL_VERBOSE, f"🔧 After conflict resolution: {list(service_data.keys())}")
 
-    # Process entities concurrently with controlled rate limiting
-    await _process_entities_concurrently(hass, expanded_entities, state, service_data, original_target)
+    # Use two-pass processing for all entities
+    await _process_entities_two_pass(hass, expanded_entities, state, service_data, original_target)
+
+    # TODO: Future enhancement - add event tracking for operation metrics
+    _log(LOGGING_LEVEL_NORMAL, f"✨ Ensure {state} completed for {original_target}")
+
+async def _process_entities_two_pass(hass: HomeAssistant, entity_ids: List[str], state: str, service_data: Dict[str, Any], original_target: str) -> None:
+    """Process entities using two-pass architecture (shared by turn_on/off and toggle)."""
+    config = _get_service_config()
+
+    # === FIRST PASS: Quick commands ===
+    _log(LOGGING_LEVEL_NORMAL, f"🚀 First pass: Checking {len(entity_ids)} entities for {state}")
+    start_time = time.time()
+    first_pass_sent = []
+
+    for entity_id in entity_ids:
+        # Check if already in target state
+        if await _is_entity_in_target_state(hass, entity_id, state, service_data):
+            _log(LOGGING_LEVEL_VERBOSE, f"⏭️ {entity_id}: Already in target state, skipping")
+            continue
+
+        # Send single command
+        await _send_single_command(hass, entity_id, state, service_data)
+        first_pass_sent.append(entity_id)
+
+        # Stagger delay between commands
+        group_stagger_delay = config[CONF_GROUP_STAGGER_DELAY]
+        if group_stagger_delay > 0:
+            await asyncio.sleep(group_stagger_delay / 1000)
+
+    # === WAIT: Smart wait for base_timeout ===
+    if first_pass_sent:
+        elapsed_ms = (time.time() - start_time) * 1000
+        base_timeout = config[CONF_BASE_TIMEOUT]
+
+        if elapsed_ms < base_timeout:
+            wait_additional_ms = base_timeout - elapsed_ms
+            _log(LOGGING_LEVEL_VERBOSE, f"⏳ Waiting additional {wait_additional_ms:.0f}ms to reach base_timeout")
+            await asyncio.sleep(wait_additional_ms / 1000)
+        else:
+            _log(LOGGING_LEVEL_VERBOSE, f"⏩ First pass took {elapsed_ms:.0f}ms, already exceeded base_timeout ({base_timeout}ms)")
+
+    # === SECOND PASS: Validate and retry failures ===
+    _log(LOGGING_LEVEL_NORMAL, f"🔍 Second pass: Validating and retrying if needed")
+
+    for entity_id in entity_ids:
+        # Check if now in target state
+        if await _is_entity_in_target_state(hass, entity_id, state, service_data):
+            _log(LOGGING_LEVEL_VERBOSE, f"✅ {entity_id}: Confirmed in target state")
+            continue
+
+        # Still wrong - full retry with backoff
+        _log(LOGGING_LEVEL_VERBOSE, f"🔄 {entity_id}: Needs retry")
+        try:
+            await _ensure_entity_state_core(
+                hass, entity_id, state, service_data,
+                original_target, allow_background_retry=False
+            )
+        except Exception as e:
+            # Failed after max_retries - queue new ensure call
+            _log(LOGGING_LEVEL_NORMAL, f"⚠️ {entity_id}: Failed retry, queueing new ensure.turn_{state} call")
+            hass.async_create_task(
+                hass.services.async_call(
+                    DOMAIN,
+                    f"turn_{state}",
+                    {"entity_id": entity_id, **service_data},
+                    blocking=False
+                )
+            )
 
 async def _handle_ensure_toggle_service(hass: HomeAssistant, call: ServiceCall) -> None:
-    """Handle the ensure toggle service call with retry logic."""
+    """Handle the ensure toggle service call with two-pass retry logic."""
 
-    # Get original input for first attempt (preserves groups)
     original_target = _get_original_target(call)
     if not original_target:
         raise ServiceValidationError("No entities specified")
@@ -185,9 +271,9 @@ async def _handle_ensure_toggle_service(hass: HomeAssistant, call: ServiceCall) 
 
     # Get service data
     service_data = dict(call.data)
-    service_data.pop("entity_id", None)  # Remove if present
+    service_data.pop("entity_id", None)
 
-    # Expand to individual entities to check their current states
+    # Expand to individual entities
     expanded_entities = _get_target_entities(hass, call)
     if not expanded_entities:
         _log(LOGGING_LEVEL_MINIMAL, "❌ No entities found for toggle operation")
@@ -195,8 +281,7 @@ async def _handle_ensure_toggle_service(hass: HomeAssistant, call: ServiceCall) 
 
     _log(LOGGING_LEVEL_VERBOSE, f"Expanded entities for toggle: {expanded_entities}")
 
-    # For toggle, we need to determine the target state for each entity individually
-    # Check current state of each entity and create separate on/off lists
+    # Determine target state for each entity individually
     entities_to_turn_on = []
     entities_to_turn_off = []
 
@@ -212,14 +297,14 @@ async def _handle_ensure_toggle_service(hass: HomeAssistant, call: ServiceCall) 
             _log(LOGGING_LEVEL_VERBOSE, f"🔲 {entity_id}: Currently {current_state.state} -> will turn on")
             entities_to_turn_on.append(entity_id)
 
-    # Process each group with their respective target states
+    # Process each group with their respective target states using two-pass logic
     if entities_to_turn_on:
         _log(LOGGING_LEVEL_NORMAL, f"🔛 Toggle ON: {entities_to_turn_on}")
-        await _process_entities_concurrently(hass, entities_to_turn_on, "on", service_data, original_target)
+        await _process_entities_two_pass(hass, entities_to_turn_on, "on", service_data, original_target)
 
     if entities_to_turn_off:
         _log(LOGGING_LEVEL_NORMAL, f"🔲 Toggle OFF: {entities_to_turn_off}")
-        await _process_entities_concurrently(hass, entities_to_turn_off, "off", service_data, original_target)
+        await _process_entities_two_pass(hass, entities_to_turn_off, "off", service_data, original_target)
 
 async def _handle_ensure_toggle_group_service(hass: HomeAssistant, call: ServiceCall) -> None:
     """Handle the ensure toggle_group service call - mirrors HA toggle behavior with retry logic."""
@@ -262,57 +347,8 @@ async def _handle_ensure_toggle_group_service(hass: HomeAssistant, call: Service
     _log(LOGGING_LEVEL_NORMAL, f"📊 Group state analysis: {', '.join(entity_states)}")
     _log(LOGGING_LEVEL_NORMAL, f"🎯 Group considered {'ON' if group_is_on else 'OFF'} → All entities will turn {target_state.upper()}")
 
-    # Apply the same action to all entities (like HA's standard toggle)
-    await _process_entities_concurrently(hass, expanded_entities, target_state, service_data, original_target)
-
-async def _process_entities_concurrently(hass: HomeAssistant, entity_ids: List[str], state: str, service_data: Dict[str, Any], original_target: str) -> None:
-    """Process entities concurrently with rate limiting to avoid overwhelming the hub."""
-    if not entity_ids:
-        return
-
-    # Limit concurrent operations to avoid overwhelming Hubitat/integrations
-    semaphore = asyncio.Semaphore(3)  # Max 3 concurrent operations
-
-    async def process_single_entity(entity_id: str) -> None:
-        async with semaphore:
-            try:
-                await _ensure_entity_state(hass, entity_id, state, service_data, original_target)
-            except Exception as e:
-                _LOGGER.error(f"Error processing entity {entity_id}: {e}")
-
-    # Create tasks for all entities and run them concurrently
-    tasks = [process_single_entity(entity_id) for entity_id in entity_ids]
-    await asyncio.gather(*tasks, return_exceptions=True)
-
-async def _try_original_target(hass: HomeAssistant, original_target: str, state: str, service_data: Dict[str, Any]) -> None:
-    """Try the original target as-is (matching original script logic)."""
-
-    # Validate that the target entity exists
-    if not hass.states.get(original_target):
-        _log(LOGGING_LEVEL_VERBOSE, f"⚠️ Skipping original target {original_target} - entity not found")
-        return
-
-    # Determine service to call based on original script logic
-    domain = original_target.split(".")[0]
-    if domain == "group":
-        service_domain = "homeassistant"
-    else:
-        service_domain = domain
-    service_name = f"turn_{state}"
-
-    # Prepare service data
-    data = {"entity_id": original_target}
-    if service_data:
-        # Filter out ensure-specific parameters that shouldn't go to the device
-        filtered_data = {k: v for k, v in service_data.items() if k != "delay"}
-        data.update(filtered_data)
-        _log(LOGGING_LEVEL_VERBOSE, f"📡 Original target service data: {filtered_data}")
-
-    try:
-        await hass.services.async_call(service_domain, service_name, data)
-        _LOGGER.debug(f"Called {service_domain}.{service_name} for original target: {original_target}")
-    except Exception as e:
-        _LOGGER.warning(f"Original target method failed for {original_target}: {e}")
+    # Apply the same action to all entities using two-pass logic
+    await _process_entities_two_pass(hass, expanded_entities, target_state, service_data, original_target)
 
 def _get_original_target(call: ServiceCall) -> str:
     """Get the original target entity_id as specified in the call (before expansion)."""
