@@ -11,14 +11,14 @@ from homeassistant.data_entry_flow import FlowResult
 from .const import (
     DOMAIN,
     CONF_MAX_RETRIES,
-    CONF_BASE_TIMEOUT,
-    CONF_GROUP_STAGGER_DELAY,
+    CONF_COMMAND_DELAY,
+    CONF_RETRY_DELAY,
     CONF_ENABLE_NOTIFICATIONS,
     CONF_BACKGROUND_RETRY_DELAY,
     CONF_LOGGING_LEVEL,
     DEFAULT_MAX_RETRIES,
-    DEFAULT_BASE_TIMEOUT,
-    DEFAULT_GROUP_STAGGER_DELAY,
+    DEFAULT_COMMAND_DELAY,
+    DEFAULT_RETRY_DELAY,
     DEFAULT_ENABLE_NOTIFICATIONS,
     DEFAULT_BACKGROUND_RETRY_DELAY,
     DEFAULT_LOGGING_LEVEL,
@@ -40,12 +40,15 @@ class EnsureConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # Validate input
             max_retries = user_input.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES)
-            base_timeout = user_input.get(CONF_BASE_TIMEOUT, DEFAULT_BASE_TIMEOUT)
+            command_delay = user_input.get(CONF_COMMAND_DELAY, DEFAULT_COMMAND_DELAY)
+            retry_delay = user_input.get(CONF_RETRY_DELAY, DEFAULT_RETRY_DELAY)
 
             if max_retries < 1 or max_retries > 10:
                 errors[CONF_MAX_RETRIES] = "invalid_retries"
-            elif base_timeout < 500 or base_timeout > 5000:
-                errors[CONF_BASE_TIMEOUT] = "invalid_timeout"
+            elif command_delay < 50 or command_delay > 1000:
+                errors[CONF_COMMAND_DELAY] = "invalid_command_delay"
+            elif retry_delay < 250 or retry_delay > 2000:
+                errors[CONF_RETRY_DELAY] = "invalid_retry_delay"
             else:
                 # Create the entry
                 return self.async_create_entry(
@@ -59,11 +62,11 @@ class EnsureConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Optional(CONF_MAX_RETRIES, default=DEFAULT_MAX_RETRIES): vol.All(
                 int, vol.Range(min=1, max=10)
             ),
-            vol.Optional(CONF_BASE_TIMEOUT, default=DEFAULT_BASE_TIMEOUT): vol.All(
-                int, vol.Range(min=500, max=5000)
+            vol.Optional(CONF_COMMAND_DELAY, default=DEFAULT_COMMAND_DELAY): vol.All(
+                int, vol.Range(min=50, max=1000)
             ),
-            vol.Optional(CONF_GROUP_STAGGER_DELAY, default=DEFAULT_GROUP_STAGGER_DELAY): vol.All(
-                int, vol.Range(min=0, max=1000)
+            vol.Optional(CONF_RETRY_DELAY, default=DEFAULT_RETRY_DELAY): vol.All(
+                int, vol.Range(min=250, max=2000)
             ),
             vol.Optional(CONF_ENABLE_NOTIFICATIONS, default=DEFAULT_ENABLE_NOTIFICATIONS): bool,
             vol.Optional(CONF_BACKGROUND_RETRY_DELAY, default=DEFAULT_BACKGROUND_RETRY_DELAY): vol.All(
@@ -103,13 +106,16 @@ class EnsureOptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             # Validate input
             max_retries = user_input.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES)
-            base_timeout = user_input.get(CONF_BASE_TIMEOUT, DEFAULT_BASE_TIMEOUT)
+            command_delay = user_input.get(CONF_COMMAND_DELAY, DEFAULT_COMMAND_DELAY)
+            retry_delay = user_input.get(CONF_RETRY_DELAY, DEFAULT_RETRY_DELAY)
             background_retry_delay = user_input.get(CONF_BACKGROUND_RETRY_DELAY, DEFAULT_BACKGROUND_RETRY_DELAY)
 
             if max_retries < 1 or max_retries > 10:
                 errors[CONF_MAX_RETRIES] = "invalid_retries"
-            elif base_timeout < 500 or base_timeout > 5000:
-                errors[CONF_BASE_TIMEOUT] = "invalid_timeout"
+            elif command_delay < 50 or command_delay > 1000:
+                errors[CONF_COMMAND_DELAY] = "invalid_command_delay"
+            elif retry_delay < 250 or retry_delay > 2000:
+                errors[CONF_RETRY_DELAY] = "invalid_retry_delay"
             elif background_retry_delay < 10 or background_retry_delay > 300:
                 errors[CONF_BACKGROUND_RETRY_DELAY] = "invalid_background_delay"
             else:
@@ -125,13 +131,13 @@ class EnsureOptionsFlowHandler(config_entries.OptionsFlow):
                 default=current_options.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES)
             ): vol.All(int, vol.Range(min=1, max=10)),
             vol.Optional(
-                CONF_BASE_TIMEOUT,
-                default=current_options.get(CONF_BASE_TIMEOUT, DEFAULT_BASE_TIMEOUT)
-            ): vol.All(int, vol.Range(min=500, max=5000)),
+                CONF_COMMAND_DELAY,
+                default=current_options.get(CONF_COMMAND_DELAY, DEFAULT_COMMAND_DELAY)
+            ): vol.All(int, vol.Range(min=50, max=1000)),
             vol.Optional(
-                CONF_GROUP_STAGGER_DELAY,
-                default=current_options.get(CONF_GROUP_STAGGER_DELAY, DEFAULT_GROUP_STAGGER_DELAY)
-            ): vol.All(int, vol.Range(min=0, max=1000)),
+                CONF_RETRY_DELAY,
+                default=current_options.get(CONF_RETRY_DELAY, DEFAULT_RETRY_DELAY)
+            ): vol.All(int, vol.Range(min=250, max=2000)),
             vol.Optional(
                 CONF_ENABLE_NOTIFICATIONS,
                 default=current_options.get(CONF_ENABLE_NOTIFICATIONS, DEFAULT_ENABLE_NOTIFICATIONS)

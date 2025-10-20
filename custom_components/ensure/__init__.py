@@ -7,12 +7,14 @@ from homeassistant.helpers.typing import ConfigType
 from .const import (
     DOMAIN,
     CONF_MAX_RETRIES,
-    CONF_BASE_TIMEOUT,
+    CONF_COMMAND_DELAY,
+    CONF_RETRY_DELAY,
     CONF_ENABLE_NOTIFICATIONS,
     CONF_BACKGROUND_RETRY_DELAY,
     CONF_LOGGING_LEVEL,
     DEFAULT_MAX_RETRIES,
-    DEFAULT_BASE_TIMEOUT,
+    DEFAULT_COMMAND_DELAY,
+    DEFAULT_RETRY_DELAY,
     DEFAULT_ENABLE_NOTIFICATIONS,
     DEFAULT_BACKGROUND_RETRY_DELAY,
     DEFAULT_LOGGING_LEVEL,
@@ -33,7 +35,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     options = entry.options
     config_data = {
         CONF_MAX_RETRIES: options.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES),
-        CONF_BASE_TIMEOUT: options.get(CONF_BASE_TIMEOUT, DEFAULT_BASE_TIMEOUT),
+        CONF_COMMAND_DELAY: options.get(CONF_COMMAND_DELAY, DEFAULT_COMMAND_DELAY),
+        CONF_RETRY_DELAY: options.get(CONF_RETRY_DELAY, DEFAULT_RETRY_DELAY),
         CONF_ENABLE_NOTIFICATIONS: options.get(CONF_ENABLE_NOTIFICATIONS, DEFAULT_ENABLE_NOTIFICATIONS),
         CONF_BACKGROUND_RETRY_DELAY: options.get(CONF_BACKGROUND_RETRY_DELAY, DEFAULT_BACKGROUND_RETRY_DELAY),
         CONF_LOGGING_LEVEL: options.get(CONF_LOGGING_LEVEL, DEFAULT_LOGGING_LEVEL),
@@ -76,7 +79,8 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
         options = entry.options
         config_data = {
             CONF_MAX_RETRIES: options.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES),
-            CONF_BASE_TIMEOUT: options.get(CONF_BASE_TIMEOUT, DEFAULT_BASE_TIMEOUT),
+            CONF_COMMAND_DELAY: options.get(CONF_COMMAND_DELAY, DEFAULT_COMMAND_DELAY),
+            CONF_RETRY_DELAY: options.get(CONF_RETRY_DELAY, DEFAULT_RETRY_DELAY),
             CONF_ENABLE_NOTIFICATIONS: options.get(CONF_ENABLE_NOTIFICATIONS, DEFAULT_ENABLE_NOTIFICATIONS),
             CONF_BACKGROUND_RETRY_DELAY: options.get(CONF_BACKGROUND_RETRY_DELAY, DEFAULT_BACKGROUND_RETRY_DELAY),
             CONF_LOGGING_LEVEL: options.get(CONF_LOGGING_LEVEL, DEFAULT_LOGGING_LEVEL),
@@ -85,8 +89,10 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
         # Validate config data
         if not isinstance(config_data[CONF_MAX_RETRIES], int) or config_data[CONF_MAX_RETRIES] < 1:
             raise ValueError(f"Invalid max_retries: {config_data[CONF_MAX_RETRIES]}")
-        if not isinstance(config_data[CONF_BASE_TIMEOUT], int) or config_data[CONF_BASE_TIMEOUT] < 500:
-            raise ValueError(f"Invalid base_timeout: {config_data[CONF_BASE_TIMEOUT]}")
+        if not isinstance(config_data[CONF_COMMAND_DELAY], int) or config_data[CONF_COMMAND_DELAY] < 50:
+            raise ValueError(f"Invalid command_delay: {config_data[CONF_COMMAND_DELAY]}")
+        if not isinstance(config_data[CONF_RETRY_DELAY], int) or config_data[CONF_RETRY_DELAY] < 250:
+            raise ValueError(f"Invalid retry_delay: {config_data[CONF_RETRY_DELAY]}")
 
         # Update stored config
         hass.data[DOMAIN][entry.entry_id] = config_data

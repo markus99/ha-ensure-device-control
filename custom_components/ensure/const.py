@@ -10,16 +10,16 @@ SERVICE_TOGGLE_GROUP = "toggle_group"
 
 # Configuration options (user configurable)
 CONF_MAX_RETRIES = "max_retries"
-CONF_BASE_TIMEOUT = "base_timeout"
-CONF_GROUP_STAGGER_DELAY = "group_stagger_delay"
+CONF_COMMAND_DELAY = "command_delay"
+CONF_RETRY_DELAY = "retry_delay"
 CONF_ENABLE_NOTIFICATIONS = "enable_notifications"
 CONF_BACKGROUND_RETRY_DELAY = "background_retry_delay"
 CONF_LOGGING_LEVEL = "logging_level"
 
 # Default configuration values
 DEFAULT_MAX_RETRIES = 5
-DEFAULT_BASE_TIMEOUT = 1000  # milliseconds
-DEFAULT_GROUP_STAGGER_DELAY = 100  # milliseconds
+DEFAULT_COMMAND_DELAY = 150  # milliseconds - first pass stagger delay between commands
+DEFAULT_RETRY_DELAY = 500  # milliseconds - second pass incremental delay for progressive backoff
 DEFAULT_ENABLE_NOTIFICATIONS = True
 DEFAULT_BACKGROUND_RETRY_DELAY = 30  # seconds
 DEFAULT_LOGGING_LEVEL = 2  # Normal logging
@@ -36,7 +36,7 @@ LOGGING_LEVEL_OPTIONS = {
 }
 
 # Fixed retry settings (not configurable)
-FIXED_TIMEOUT_INCREMENT = 500  # milliseconds
+FIXED_RETRY_MIN_TIMEOUT = 1000  # milliseconds - minimum timeout for first retry attempt
 FIXED_INITIAL_DELAY = 1  # seconds
 BACKGROUND_RETRY_DISABLE_THRESHOLD = 300  # seconds
 

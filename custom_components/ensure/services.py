@@ -17,21 +17,21 @@ from .const import (
     SERVICE_TOGGLE,
     SERVICE_TOGGLE_GROUP,
     CONF_MAX_RETRIES,
-    CONF_BASE_TIMEOUT,
-    CONF_GROUP_STAGGER_DELAY,
+    CONF_COMMAND_DELAY,
+    CONF_RETRY_DELAY,
     CONF_ENABLE_NOTIFICATIONS,
     CONF_BACKGROUND_RETRY_DELAY,
     CONF_LOGGING_LEVEL,
     DEFAULT_MAX_RETRIES,
-    DEFAULT_BASE_TIMEOUT,
-    DEFAULT_GROUP_STAGGER_DELAY,
+    DEFAULT_COMMAND_DELAY,
+    DEFAULT_RETRY_DELAY,
     DEFAULT_ENABLE_NOTIFICATIONS,
     DEFAULT_BACKGROUND_RETRY_DELAY,
     DEFAULT_LOGGING_LEVEL,
     LOGGING_LEVEL_MINIMAL,
     LOGGING_LEVEL_NORMAL,
     LOGGING_LEVEL_VERBOSE,
-    FIXED_TIMEOUT_INCREMENT,
+    FIXED_RETRY_MIN_TIMEOUT,
     FIXED_INITIAL_DELAY,
     BACKGROUND_RETRY_DISABLE_THRESHOLD,
     BRIGHTNESS_TOLERANCE,
@@ -51,8 +51,8 @@ import threading
 _service_config_lock = threading.Lock()
 _service_config = {
     CONF_MAX_RETRIES: DEFAULT_MAX_RETRIES,
-    CONF_BASE_TIMEOUT: DEFAULT_BASE_TIMEOUT,
-    CONF_GROUP_STAGGER_DELAY: DEFAULT_GROUP_STAGGER_DELAY,
+    CONF_COMMAND_DELAY: DEFAULT_COMMAND_DELAY,
+    CONF_RETRY_DELAY: DEFAULT_RETRY_DELAY,
     CONF_ENABLE_NOTIFICATIONS: DEFAULT_ENABLE_NOTIFICATIONS,
     CONF_BACKGROUND_RETRY_DELAY: DEFAULT_BACKGROUND_RETRY_DELAY,
     CONF_LOGGING_LEVEL: DEFAULT_LOGGING_LEVEL,
@@ -199,9 +199,8 @@ async def _process_entities_two_pass(hass: HomeAssistant, entity_ids: List[str],
     """Process entities using two-pass architecture (shared by turn_on/off and toggle)."""
     config = _get_service_config()
 
-    # === FIRST PASS: Quick commands ===
-    _log(LOGGING_LEVEL_NORMAL, f"🚀 First pass: Checking {len(entity_ids)} entities for {state}")
-    start_time = time.time()
+    # === FIRST PASS: Fire and Forget (No State Wait) ===
+    _log(LOGGING_LEVEL_NORMAL, f"🚀 First pass: Sending commands to {len(entity_ids)} entities for {state}")
     first_pass_sent = []
 
     for entity_id in entity_ids:
@@ -210,26 +209,15 @@ async def _process_entities_two_pass(hass: HomeAssistant, entity_ids: List[str],
             _log(LOGGING_LEVEL_VERBOSE, f"⏭️ {entity_id}: Already in target state, skipping")
             continue
 
-        # Send single command
+        # Send command (fire and forget - no state wait)
         await _send_single_command(hass, entity_id, state, service_data)
         first_pass_sent.append(entity_id)
+        _log(LOGGING_LEVEL_VERBOSE, f"📤 {entity_id}: Command sent")
 
         # Stagger delay between commands
-        group_stagger_delay = config[CONF_GROUP_STAGGER_DELAY]
-        if group_stagger_delay > 0:
-            await asyncio.sleep(group_stagger_delay / 1000)
-
-    # === WAIT: Smart wait for base_timeout ===
-    if first_pass_sent:
-        elapsed_ms = (time.time() - start_time) * 1000
-        base_timeout = config[CONF_BASE_TIMEOUT]
-
-        if elapsed_ms < base_timeout:
-            wait_additional_ms = base_timeout - elapsed_ms
-            _log(LOGGING_LEVEL_VERBOSE, f"⏳ Waiting additional {wait_additional_ms:.0f}ms to reach base_timeout")
-            await asyncio.sleep(wait_additional_ms / 1000)
-        else:
-            _log(LOGGING_LEVEL_VERBOSE, f"⏩ First pass took {elapsed_ms:.0f}ms, already exceeded base_timeout ({base_timeout}ms)")
+        command_delay = config[CONF_COMMAND_DELAY]
+        if command_delay > 0:
+            await asyncio.sleep(command_delay / 1000)
 
     # === SECOND PASS: Validate and retry failures ===
     _log(LOGGING_LEVEL_NORMAL, f"🔍 Second pass: Validating and retrying if needed")
@@ -397,13 +385,9 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
 
     retry_count = 0
     max_retries = config[CONF_MAX_RETRIES]
+    retry_delay = config[CONF_RETRY_DELAY]
 
     _log(LOGGING_LEVEL_VERBOSE, f"🎯 {entity_id}: max_retries={max_retries}, domain={domain}")
-
-    # Use delay parameter override if provided, otherwise use configured base timeout
-    base_timeout = service_data.get("delay", config[CONF_BASE_TIMEOUT])
-    if "delay" in service_data:
-        _log(LOGGING_LEVEL_VERBOSE, f"⏱️ Using custom delay override: {base_timeout}ms for {entity_id}")
 
     while retry_count < max_retries:
         # Check if entity is already in desired state
@@ -415,13 +399,11 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
 
         _log(LOGGING_LEVEL_VERBOSE, f"🔄 {entity_id}: Starting attempt {retry_count}/{max_retries}")
 
-        # Calculate timeout for this attempt
-        timeout_ms = base_timeout + (retry_count * FIXED_TIMEOUT_INCREMENT)
+        # Calculate timeout for this attempt using formula: 1000 + (retry_delay * (attempt - 1))
+        timeout_ms = FIXED_RETRY_MIN_TIMEOUT + (retry_delay * (retry_count - 1))
         timeout_sec = timeout_ms / 1000
 
-        _log(LOGGING_LEVEL_VERBOSE, f"⏱️ {entity_id}: timeout={timeout_ms}ms for attempt {retry_count}")
-
-        # Remove duplicate debug log (already logged above)
+        _log(LOGGING_LEVEL_VERBOSE, f"⏱️ {entity_id}: max timeout={timeout_ms}ms for attempt {retry_count}")
 
         # Call the service
         data = {"entity_id": entity_id}
@@ -430,22 +412,29 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
             filtered_data = {k: v for k, v in service_data.items() if k != "delay"}
             data.update(filtered_data)
 
+        # Track start time for metrics
+        attempt_start_time = time.time()
+
         try:
             service_name = f"turn_{target_state}"
-            _log(LOGGING_LEVEL_VERBOSE, f"📡 Calling {service_domain}.{service_name} for {entity_id} with: {data}")
+            _log(LOGGING_LEVEL_VERBOSE, f"📡 Calling {service_domain}.{service_name} for {entity_id}")
             await hass.services.async_call(service_domain, service_name, data)
             _log(LOGGING_LEVEL_VERBOSE, f"✅ Service call completed for {entity_id}")
         except Exception as e:
             _log(LOGGING_LEVEL_MINIMAL, f"❌ Service call failed for {entity_id} on attempt {retry_count}: {e}")
 
-        # Wait for state change with timeout
+        # Wait for state change with timeout (event-driven - exits immediately on success!)
         try:
             await asyncio.wait_for(
                 _wait_for_state_change(hass, entity_id, target_state, service_data),
                 timeout=timeout_sec
             )
+            # Calculate actual wait time
+            actual_wait_ms = (time.time() - attempt_start_time) * 1000
+            _log(LOGGING_LEVEL_NORMAL, f"⚡ {entity_id}: State confirmed in {actual_wait_ms:.0f}ms (max was {timeout_ms}ms)")
         except asyncio.TimeoutError:
-            _log(LOGGING_LEVEL_VERBOSE, f"⏰ Timeout waiting for {entity_id} state change on attempt {retry_count}")
+            actual_wait_ms = (time.time() - attempt_start_time) * 1000
+            _log(LOGGING_LEVEL_VERBOSE, f"⏰ {entity_id}: Timeout after {actual_wait_ms:.0f}ms on attempt {retry_count}")
             continue
 
     # If we get here, all retries failed
@@ -473,12 +462,30 @@ async def _ensure_entity_state_core(hass: HomeAssistant, entity_id: str, target_
         raise Exception(f"Retry failed after {max_retries} attempts")
 
 async def _wait_for_state_change(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any]) -> None:
-    """Wait for entity to reach target state."""
+    """Wait for entity to reach target state using event-driven approach."""
 
-    while True:
-        if await _is_entity_in_target_state(hass, entity_id, target_state, service_data):
-            return
-        await asyncio.sleep(0.1)  # Check every 100ms
+    # Check immediately first
+    if await _is_entity_in_target_state(hass, entity_id, target_state, service_data):
+        return
+
+    # Set up event listener for state changes
+    event_received = asyncio.Event()
+
+    async def state_changed_listener(event):
+        """Listen for state_changed events for this entity."""
+        if event.data.get("entity_id") == entity_id:
+            if await _is_entity_in_target_state(hass, entity_id, target_state, service_data):
+                event_received.set()
+
+    # Subscribe to state_changed events
+    remove_listener = hass.bus.async_listen("state_changed", state_changed_listener)
+
+    try:
+        # Wait for the event to be set (will be cancelled by timeout in caller)
+        await event_received.wait()
+    finally:
+        # Clean up listener
+        remove_listener()
 
 async def _is_entity_in_target_state(hass: HomeAssistant, entity_id: str, target_state: str, service_data: Dict[str, Any]) -> bool:
     """Check if entity is in the target state with tolerances."""
