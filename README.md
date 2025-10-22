@@ -1,220 +1,98 @@
-# Ensure Device Control for Home Assistant (BETA)
+# Ensure Device Control
 
-⚠️ **BETA VERSION - ADVANCED TESTING PHASE** ⚠️
+A simple Home Assistant custom integration that provides reliable device control with automatic retry logic.
 
-A Home Assistant custom integration that provides **reliable device control** with intelligent retry logic, background recovery, and Hubitat overload protection.
+## Overview
 
-## Why This Integration?
+This integration wraps `script.ensure_device_changes` with clean, easy-to-use services. It provides three services that ensure your devices reach their desired state, even when commands occasionally fail.
 
-Standard Home Assistant device commands sometimes fail, especially with:
-- **Hubitat Maker API** integrations
-- **Z-Wave/Zigbee** mesh network congestion
-- **Remote devices** with connectivity issues
-- **Slow fans** that need extra time to respond
-- **Critical automations** that must work reliably
+## Prerequisites
 
-This integration solves those problems by adding retry logic with exponential backoff and state verification to ensure your devices actually respond.
-
-## Quick Start
-
-After installation, replace your existing service calls:
-
-```yaml
-# Instead of this:
-action: light.turn_on
-target:
-  entity_id: light.living_room
-data:
-  brightness_pct: 75
-
-# Use this:
-action: ensure.turn_on
-target:
-  entity_id: light.living_room
-data:
-  brightness_pct: 75
-```
-
-**Works with lights, switches, fans, and groups:**
-
-```yaml
-# Fan control with retry
-action: ensure.turn_on
-target:
-  entity_id: fan.bedroom
-data:
-  speed_pct: 60
-
-# Group operations (fast bulk + individual verification)
-action: ensure.turn_on
-target:
-  entity_id: group.living_room_lights
-data:
-  brightness_pct: 80
-
-# Toggle devices - each entity flips individually
-action: ensure.toggle
-target:
-  entity_id: light.kitchen
-data:
-  brightness_pct: 90  # Used when turning ON
-
-# Toggle group - mirrors Home Assistant behavior
-action: ensure.toggle_group
-target:
-  entity_id: group.bedroom_lights
-data:
-  brightness_pct: 75  # All get same action based on group state
-```
-
-The integration will automatically retry up to 5 times with increasing delays if the device doesn't respond, and notify you if it ultimately fails.
-
-## Toggle Service Comparison
-
-**`ensure.toggle`** - Smart Individual Toggle
-- Each entity flips to its opposite state individually
-- Mixed group example: ON + OFF + ON → OFF + ON + OFF
-- Best for: Getting mixed groups into a consistent state
-
-**`ensure.toggle_group`** - Group-Based Toggle (like Home Assistant)
-- Treats group as single unit: if ANY entity is on, turn ALL off
-- Mixed group example: ON + OFF + ON → ALL OFF
-- Best for: Standard Home Assistant toggle behavior with reliability
-
-## ✨ New in v0.3.1-beta
-
-### 🚀 **Performance Improvements**
-- **Concurrent Processing**: Groups now process up to 3x faster
-- **Smart Rate Limiting**: Protects Hubitat from overload (max 3 concurrent operations)
-
-### 🧠 **Intelligent Background Retry**
-- **Automatic Recovery**: 30-second background retry for temporary issues
-- **Silent Success**: Most problems resolve without bothering you
-- **Configurable Timing**: Adjust background retry delay (10-300 seconds)
-
-### 🔔 **Smart Notifications**
-- **Reduced Noise**: Only notify when manual intervention truly needed
-- **Specific Details**: Shows exactly which device failed in groups
-- **One-Click Retry**: Working retry button in every notification
+**IMPORTANT:** This integration requires `script.ensure_device_changes` to be installed in your Home Assistant instance. The custom component acts as a clean interface to this script.
 
 ## Services
 
-- `ensure.turn_on` - Reliably turn on devices with full parameter support
-- `ensure.turn_off` - Reliably turn off devices
-- `ensure.toggle` - Reliably toggle devices (each entity flips individually)
-- `ensure.toggle_group` - Reliably toggle as group (mirrors HA behavior)
+### `ensure.turn_on`
 
-## Supported Parameters
+Turn on devices with optional brightness, color, and effect parameters.
 
-All standard Home Assistant parameters are supported:
-- `brightness` / `brightness_pct` (lights)
-- `rgb_color` / `hs_color` / `xy_color` / `color_name` (lights)
-- `color_temp_kelvin` / `kelvin` (lights)
-- `speed` / `speed_pct` (fans)
-- `delay` (custom timeout override)
-- `transition` (Light Transition Timing)
-- `effect` / `flash`
-- And more...
+**Parameters:**
+- `entity_id` (required): Entity or entities to turn on
+- `brightness_pct`: Brightness percentage (0-100)
+- `brightness`: Brightness value (0-255)
+- `color_rgb`: RGB color as [R, G, B]
+- `color_name`: Named color (automatically converted to RGB)
+- `kelvin`: Color temperature in Kelvin (1000-12000)
+- `effect`: Light effect name
 
-### Parameter Conflict Resolution
-
-If you specify conflicting parameters, the integration uses priority order (first found wins):
-
-**Brightness**: `brightness_pct` > `brightness`
+**Example:**
 ```yaml
+service: ensure.turn_on
 data:
-  brightness_pct: 75  # This wins
-  brightness: 100     # This gets removed
+  entity_id: light.kitchen
+  brightness_pct: 75
+  color_name: "red"
 ```
 
-**Color**: `rgb_color` > `hs_color` > `xy_color` > `color_name`
+### `ensure.turn_off`
+
+Turn off devices.
+
+**Parameters:**
+- `entity_id` (required): Entity or entities to turn off
+
+**Example:**
 ```yaml
+service: ensure.turn_off
 data:
-  rgb_color: [255, 0, 0]  # This wins (red)
-  color_name: "blue"      # This gets removed
+  entity_id: light.bedroom
 ```
 
-**Temperature**: `color_temp_kelvin` > `kelvin`
+### `ensure.toggle`
+
+Toggle device state.
+
+**Parameters:**
+- `entity_id` (required): Entity or entities to toggle
+
+**Example:**
 ```yaml
+service: ensure.toggle
 data:
-  color_temp_kelvin: 3000  # This wins
-  kelvin: 4000             # This gets removed
+  entity_id:
+    - light.living_room
+    - light.dining_room
 ```
 
-**Fan Speed**: `speed_pct` > `speed`
-```yaml
-data:
-  speed_pct: 75     # This wins
-  speed: "high"     # This gets removed
-```
+## Features
 
-### Custom Delay Override
+- **Automatic color name conversion**: Use friendly color names like "red", "blue", "homeassistant" - automatically converted to RGB
+- **Multiple entities**: Target single entities, groups, or lists of entities
+- **Parameter precedence**: `brightness_pct` takes precedence over `brightness`
+- **Clean UI**: Full service UI integration with dropdowns and sliders
+- **No configuration needed**: Just install and use
 
-Use the `delay` parameter to override timeout for slower devices:
+## Installation via HACS
 
-```yaml
-action: ensure.turn_on
-target:
-  entity_id: fan.slow_ceiling_fan
-data:
-  speed_pct: 50
-  delay: 3000  # 3 seconds instead of default 1 second
-```
-
-**No Defaults Added**: The integration only removes conflicts - it doesn't add default values. If you don't specify brightness, the device keeps its current brightness.
-
-## Installation
-
-⚠️ **BETA VERSION**: This integration is in advanced testing. Please test thoroughly before production use.
-
-### Via HACS (Recommended)
-1. Add this repository as a custom HACS repository
-2. Install "Ensure Device Control (BETA)"
+1. Add this repository to HACS as a custom repository
+2. Install "Ensure Device Control"
 3. Restart Home Assistant
+4. Services will be available immediately (no configuration required)
 
-**Note**: If the integration icon doesn't appear in HACS, try:
-- Refresh your browser cache (Ctrl+F5)
-- Wait a few minutes for HACS to sync the icon
-- Check HACS > Settings > Clear cache
+## Technical Details
 
-### Manual Installation
-1. Copy `custom_components/ensure/` to your HA installation
-2. Restart Home Assistant
+- **No config flow**: This integration has no configuration UI - it's ready to use immediately
+- **Passthrough architecture**: Simply wraps `script.ensure_device_changes` with a clean interface
+- **147 color names**: Supports all CSS3/X11 standard color names
+- **Entity ID translation**: Accepts `entity_id` parameter and passes as `device` to the script
 
-## Configuration
+## Version
 
-The integration includes a configuration UI accessible via:
-**Settings** → **Integrations** → **Add Integration** → **Ensure Device Control**
+- **Current**: 1.0.0
+- **Architecture**: Simple wrapper (no retry logic in component itself)
+- **Dependencies**: Requires `script.ensure_device_changes`
 
-Configure:
-- Max retry attempts (1-10, default: 5)
-- Base timeout (500-5000ms, default: 1000ms)
-- Failure notifications (on/off, default: on)
-- Background retry delay (10-300 seconds, default: 30s)
-- Debug logging level (1-3, default: 2)
-  - **1 (Minimal)**: Only errors and critical failures
-  - **2 (Normal)**: Standard operational logging
-  - **3 (Verbose)**: Full debug information with detailed state tracking
+## Support
 
-## Testing & Feedback
-
-**BETA testing in progress** - feedback needed:
-
-1. **Test thoroughly** with non-critical devices first
-2. **Report issues** via GitHub Issues
-3. **Share feedback** on functionality and reliability
-4. **Check logs** for any errors or unexpected behavior
-
-Known areas needing testing:
-- Group entity handling
-- Various device types (lights, switches, fans, etc.)
-- Configuration options functionality
-- Error handling and recovery
-
-## Contributing
-
-Issues and pull requests welcome! This integration was born from real-world Hubitat reliability problems.
-
-## License
-
-MIT License - see LICENSE file for details.
+- **Issues**: https://github.com/markus99/ha-ensure-device-control/issues
+- **Repository**: https://github.com/markus99/ha-ensure-device-control
