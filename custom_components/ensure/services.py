@@ -25,6 +25,17 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         """Handle the ensure.turn_on service call."""
         # Get all parameters
         entity_id = call.data.get("entity_id")
+        # Convert entity_id from Wrapper/list to string or comma-separated list
+        if isinstance(entity_id, str):
+            device_param = entity_id
+        elif entity_id is not None:
+            # Convert to list first (handles Wrapper objects), then join
+            entity_list = list(entity_id)
+            # If single entity, pass as string; if multiple, pass as comma-separated
+            device_param = entity_list[0] if len(entity_list) == 1 else ", ".join(entity_list)
+        else:
+            device_param = None
+
         brightness_pct = call.data.get("brightness_pct")
         brightness = call.data.get("brightness")
         color_rgb = call.data.get("color_rgb")
@@ -43,7 +54,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         # Build service data for script
         script_data = {
-            "device": entity_id,
+            "device": device_param,
             "state": "on",
         }
 
@@ -72,9 +83,19 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     async def handle_turn_off(call: ServiceCall) -> None:
         """Handle the ensure.turn_off service call."""
         entity_id = call.data.get("entity_id")
+        # Convert entity_id from Wrapper/list to string or comma-separated list
+        if isinstance(entity_id, str):
+            device_param = entity_id
+        elif entity_id is not None:
+            # Convert to list first (handles Wrapper objects), then join
+            entity_list = list(entity_id)
+            # If single entity, pass as string; if multiple, pass as comma-separated
+            device_param = entity_list[0] if len(entity_list) == 1 else ", ".join(entity_list)
+        else:
+            device_param = None
 
         script_data = {
-            "device": entity_id,
+            "device": device_param,
             "state": "off",
         }
 
@@ -90,9 +111,19 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     async def handle_toggle(call: ServiceCall) -> None:
         """Handle the ensure.toggle service call."""
         entity_id = call.data.get("entity_id")
+        # Convert entity_id from Wrapper/list to string or comma-separated list
+        if isinstance(entity_id, str):
+            device_param = entity_id
+        elif entity_id is not None:
+            # Convert to list first (handles Wrapper objects), then join
+            entity_list = list(entity_id)
+            # If single entity, pass as string; if multiple, pass as comma-separated
+            device_param = entity_list[0] if len(entity_list) == 1 else ", ".join(entity_list)
+        else:
+            device_param = None
 
         script_data = {
-            "device": entity_id,
+            "device": device_param,
             "state": "toggle",
         }
 
