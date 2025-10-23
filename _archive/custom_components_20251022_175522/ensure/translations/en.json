@@ -1,0 +1,46 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Ensure Device Control",
+        "description": "Configure timing and retry settings for reliable device control.",
+        "data": {
+          "max_retries": "Maximum retry attempts (1-10)",
+          "command_delay": "Command delay in milliseconds (50-1000) - Delay between commands to multiple devices, no state wait",
+          "retry_delay": "Retry delay increment in milliseconds (250-2000) - Added per retry attempt for progressive backoff",
+          "enable_notifications": "Enable failure notifications",
+          "background_retry_delay": "Background retry delay in seconds (10-300)",
+          "logging_level": "Logging verbosity level"
+        }
+      }
+    },
+    "error": {
+      "invalid_retries": "Maximum retries must be between 1 and 10",
+      "invalid_command_delay": "Command delay must be between 50 and 1000 milliseconds",
+      "invalid_retry_delay": "Retry delay must be between 250 and 2000 milliseconds",
+      "invalid_background_delay": "Background retry delay must be between 10 and 300 seconds"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ensure Device Control Options",
+        "description": "Configure timing and retry settings for reliable device control.",
+        "data": {
+          "max_retries": "Maximum retry attempts (1-10)",
+          "command_delay": "Command delay in milliseconds (50-1000) - Delay between commands to multiple devices, no state wait",
+          "retry_delay": "Retry delay increment in milliseconds (250-2000) - Added per retry attempt for progressive backoff",
+          "enable_notifications": "Enable failure notifications",
+          "background_retry_delay": "Background retry delay in seconds (10-300)",
+          "logging_level": "Logging verbosity level"
+        }
+      }
+    },
+    "error": {
+      "invalid_retries": "Maximum retries must be between 1 and 10",
+      "invalid_command_delay": "Command delay must be between 50 and 1000 milliseconds",
+      "invalid_retry_delay": "Retry delay must be between 250 and 2000 milliseconds",
+      "invalid_background_delay": "Background retry delay must be between 10 and 300 seconds"
+    }
+  }
+}

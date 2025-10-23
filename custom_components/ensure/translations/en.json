@@ -1,46 +1,58 @@
 {
-  "config": {
-    "step": {
-      "user": {
-        "title": "Ensure Device Control",
-        "description": "Configure timing and retry settings for reliable device control.",
-        "data": {
-          "max_retries": "Maximum retry attempts (1-10)",
-          "command_delay": "Command delay in milliseconds (50-1000) - Delay between commands to multiple devices, no state wait",
-          "retry_delay": "Retry delay increment in milliseconds (250-2000) - Added per retry attempt for progressive backoff",
-          "enable_notifications": "Enable failure notifications",
-          "background_retry_delay": "Background retry delay in seconds (10-300)",
-          "logging_level": "Logging verbosity level"
+  "services": {
+    "turn_on": {
+      "name": "Turn On (with retry)",
+      "description": "Turn on a device with automatic retry logic via script.ensure_device_changes",
+      "fields": {
+        "entity_id": {
+          "name": "Entity",
+          "description": "The entity or entities to turn on"
+        },
+        "brightness_pct": {
+          "name": "Brightness (%)",
+          "description": "Brightness percentage (0-100). Takes precedence over brightness."
+        },
+        "brightness": {
+          "name": "Brightness (0-255)",
+          "description": "Brightness value (0-255). Used if brightness_pct is not provided."
+        },
+        "color_rgb": {
+          "name": "RGB Color",
+          "description": "RGB color as a list of three integers [R, G, B]"
+        },
+        "color_name": {
+          "name": "Color Name",
+          "description": "Named color (e.g., red, blue, homeassistant). Automatically converted to RGB."
+        },
+        "kelvin": {
+          "name": "Color Temperature (Kelvin)",
+          "description": "Color temperature in Kelvin (1000-12000)"
+        },
+        "effect": {
+          "name": "Light Effect",
+          "description": "Light effect name (e.g., colorloop, random)"
         }
       }
     },
-    "error": {
-      "invalid_retries": "Maximum retries must be between 1 and 10",
-      "invalid_command_delay": "Command delay must be between 50 and 1000 milliseconds",
-      "invalid_retry_delay": "Retry delay must be between 250 and 2000 milliseconds",
-      "invalid_background_delay": "Background retry delay must be between 10 and 300 seconds"
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Ensure Device Control Options",
-        "description": "Configure timing and retry settings for reliable device control.",
-        "data": {
-          "max_retries": "Maximum retry attempts (1-10)",
-          "command_delay": "Command delay in milliseconds (50-1000) - Delay between commands to multiple devices, no state wait",
-          "retry_delay": "Retry delay increment in milliseconds (250-2000) - Added per retry attempt for progressive backoff",
-          "enable_notifications": "Enable failure notifications",
-          "background_retry_delay": "Background retry delay in seconds (10-300)",
-          "logging_level": "Logging verbosity level"
+    "turn_off": {
+      "name": "Turn Off (with retry)",
+      "description": "Turn off a device with automatic retry logic via script.ensure_device_changes",
+      "fields": {
+        "entity_id": {
+          "name": "Entity",
+          "description": "The entity or entities to turn off"
         }
       }
     },
-    "error": {
-      "invalid_retries": "Maximum retries must be between 1 and 10",
-      "invalid_command_delay": "Command delay must be between 50 and 1000 milliseconds",
-      "invalid_retry_delay": "Retry delay must be between 250 and 2000 milliseconds",
-      "invalid_background_delay": "Background retry delay must be between 10 and 300 seconds"
+    "toggle": {
+      "name": "Toggle (with retry)",
+      "description": "Toggle a device's state with automatic retry logic via script.ensure_device_changes",
+      "fields": {
+        "entity_id": {
+          "name": "Entity",
+          "description": "The entity or entities to toggle"
+        }
+      }
     }
   }
 }
