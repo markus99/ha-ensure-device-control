@@ -1,4 +1,15 @@
 {
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Ensure Device Control",
+        "description": "This integration provides reliable device control services with automatic retry logic.\n\nNo configuration is required - just click Submit to continue."
+      }
+    },
+    "abort": {
+      "already_configured": "Ensure Device Control is already configured"
+    }
+  },
   "services": {
     "turn_on": {
       "name": "Turn On (with retry)",

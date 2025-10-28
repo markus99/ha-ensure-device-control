@@ -77,18 +77,20 @@ data:
 1. Add this repository to HACS as a custom repository
 2. Install "Ensure Device Control"
 3. Restart Home Assistant
-4. Services will be available immediately (no configuration required)
+4. Go to **Settings** → **Devices & Services** → **Add Integration**
+5. Search for "Ensure Device Control" and add it
+6. Services will be available immediately
 
 ## Technical Details
 
-- **No config flow**: This integration has no configuration UI - it's ready to use immediately
+- **Simple UI setup**: Add through Settings → Devices & Services (no parameters to configure)
 - **Passthrough architecture**: Simply wraps `script.ensure_device_changes` with a clean interface
 - **147 color names**: Supports all CSS3/X11 standard color names
 - **Entity ID translation**: Accepts `entity_id` parameter and passes as `device` to the script
 
 ## Version
 
-- **Current**: 1.0.0
+- **Current**: 1.0.3
 - **Architecture**: Simple wrapper (no retry logic in component itself)
 - **Dependencies**: Requires `script.ensure_device_changes`
 
