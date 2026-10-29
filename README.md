@@ -17,7 +17,7 @@ This integration wraps `script.ensure_device_changes` with clean, easy-to-use se
 Turn on devices with optional brightness, color, and effect parameters.
 
 **Parameters:**
-- `entity_id` (required): Entity or entities to turn on
+- `target.entity_id` (required): Entity or entities to turn on (entities only — areas/devices/labels are rejected)
 - `brightness_pct`: Brightness percentage (0-100)
 - `brightness`: Brightness value (0-255)
 - `color_rgb`: RGB color as [R, G, B]
@@ -27,9 +27,10 @@ Turn on devices with optional brightness, color, and effect parameters.
 
 **Example:**
 ```yaml
-service: ensure.turn_on
-data:
+action: ensure.turn_on
+target:
   entity_id: light.kitchen
+data:
   brightness_pct: 75
   color_name: "red"
 ```
@@ -39,12 +40,12 @@ data:
 Turn off devices.
 
 **Parameters:**
-- `entity_id` (required): Entity or entities to turn off
+- `target.entity_id` (required): Entity or entities to turn off
 
 **Example:**
 ```yaml
-service: ensure.turn_off
-data:
+action: ensure.turn_off
+target:
   entity_id: light.bedroom
 ```
 
@@ -53,12 +54,12 @@ data:
 Toggle device state.
 
 **Parameters:**
-- `entity_id` (required): Entity or entities to toggle
+- `target.entity_id` (required): Entity or entities to toggle
 
 **Example:**
 ```yaml
-service: ensure.toggle
-data:
+action: ensure.toggle
+target:
   entity_id:
     - light.living_room
     - light.dining_room
@@ -90,7 +91,7 @@ data:
 
 ## Version
 
-- **Current**: 1.0.3
+- **Current**: 1.1.0
 - **Architecture**: Simple wrapper (no retry logic in component itself)
 - **Dependencies**: Requires `script.ensure_device_changes`
 

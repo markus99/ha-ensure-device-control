@@ -1,14 +1,9 @@
 turn_on:
-  name: Turn On (with retry)
+  name: Turn ON
   description: Turn on a device with automatic retry logic via script.ensure_device_changes
+  target:
+    entity: {}
   fields:
-    entity_id:
-      name: Entity
-      description: The entity or entities to turn on
-      required: true
-      selector:
-        entity:
-          multiple: true
     brightness_pct:
       name: Brightness (%)
       description: Brightness percentage (0-100). Takes precedence over brightness.
@@ -55,25 +50,13 @@ turn_on:
         text:
 
 turn_off:
-  name: Turn Off (with retry)
+  name: Turn OFF
   description: Turn off a device with automatic retry logic via script.ensure_device_changes
-  fields:
-    entity_id:
-      name: Entity
-      description: The entity or entities to turn off
-      required: true
-      selector:
-        entity:
-          multiple: true
+  target:
+    entity: {}
 
 toggle:
-  name: Toggle (with retry)
+  name: Toggle
   description: Toggle a device's state with automatic retry logic via script.ensure_device_changes
-  fields:
-    entity_id:
-      name: Entity
-      description: The entity or entities to toggle
-      required: true
-      selector:
-        entity:
-          multiple: true
+  target:
+    entity: {}

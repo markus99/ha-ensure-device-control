@@ -1,0 +1,13 @@
+{
+  "services": {
+    "turn_on": {
+      "service": "mdi:power"
+    },
+    "turn_off": {
+      "service": "mdi:power-off"
+    },
+    "toggle": {
+      "service": "mdi:toggle-switch"
+    }
+  }
+}

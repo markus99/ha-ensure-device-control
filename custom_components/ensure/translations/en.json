@@ -12,13 +12,9 @@
   },
   "services": {
     "turn_on": {
-      "name": "Turn On (with retry)",
+      "name": "Turn ON",
       "description": "Turn on a device with automatic retry logic via script.ensure_device_changes",
       "fields": {
-        "entity_id": {
-          "name": "Entity",
-          "description": "The entity or entities to turn on"
-        },
         "brightness_pct": {
           "name": "Brightness (%)",
           "description": "Brightness percentage (0-100). Takes precedence over brightness."
@@ -46,24 +42,12 @@
       }
     },
     "turn_off": {
-      "name": "Turn Off (with retry)",
-      "description": "Turn off a device with automatic retry logic via script.ensure_device_changes",
-      "fields": {
-        "entity_id": {
-          "name": "Entity",
-          "description": "The entity or entities to turn off"
-        }
-      }
+      "name": "Turn OFF",
+      "description": "Turn off a device with automatic retry logic via script.ensure_device_changes"
     },
     "toggle": {
-      "name": "Toggle (with retry)",
-      "description": "Toggle a device's state with automatic retry logic via script.ensure_device_changes",
-      "fields": {
-        "entity_id": {
-          "name": "Entity",
-          "description": "The entity or entities to toggle"
-        }
-      }
+      "name": "Toggle",
+      "description": "Toggle a device's state with automatic retry logic via script.ensure_device_changes"
     }
   }
 }
